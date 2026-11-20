@@ -75,6 +75,12 @@ button{font:inherit;color:inherit;cursor:pointer}
 .day[aria-pressed="true"] span{color:var(--white);opacity:.9}
 .day .today{position:absolute;top:6px;right:8px;width:6px;height:6px;border-radius:50%;background:var(--red)}
 .day[aria-pressed="true"] .today{background:var(--white)}
+.tracks{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin-inline:calc(-1 * max(16px,env(safe-area-inset-left,0px)));padding-inline:max(16px,env(safe-area-inset-left,0px))}
+.tracks::-webkit-scrollbar{display:none}
+.trk{flex:none;border:1.5px solid var(--blue);background:transparent;color:var(--h0t);border-radius:999px;padding:6px 13px;font-size:13px;font-weight:700;white-space:nowrap}
+.trk[aria-pressed="true"]{background:var(--blue);color:var(--white)}
+.place{font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.place::before{content:"";width:9px;height:9px;border-radius:50%;border:2px solid currentColor;box-sizing:border-box}
 .tools{display:flex;gap:8px;align-items:center;min-width:0}
 .halls{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;flex:1;min-width:0;padding-block:1px}
 .halls::-webkit-scrollbar{display:none}
@@ -159,6 +165,7 @@ footer .row{display:flex;justify-content:space-between;align-items:center;gap:10
 
 <nav class="bar" id="bar" aria-label="Навигация по программе">
   <div class="wrap">
+    <div class="tracks" id="tracks" role="group" aria-label="Чья программа"></div>
     <div class="days" id="days"></div>
     <div class="tools">
       <div class="halls" id="halls"></div>
@@ -191,6 +198,7 @@ const CONFIG = {
   programGid: '595191200',      // gid листа с программой (число после #gid= в адресе листа)
   newsSheet: 'Объявления',      // необязательный лист: Когда | Текст | Важно
   infoSheet: 'Описания',        // необязательный лист: Ключ | Описание
+  tracksGid: '1637604800',      // gid листа с параллельными треками (YC Gibush program 2026)
   year: 2026,
   tz: 'Europe/Riga',
   refreshMs: 60000,
@@ -198,8 +206,9 @@ const CONFIG = {
 };
 /* =============================================== */
 
-const SNAPSHOT = ",,,ВЗРОСЛАЯ ПРОГРАММА,,,,\n,,,Seminar ,,,,\n,,,27-29.11,,,,\n,,,\"пятница, 27.11\",,,,\nзалы,,,Bulduri,,Dubulti ,,Ķemeri\n,,,Осим Хаим-вкус жизни /мастерские,,\"Искусство, Иудаизм, История, Израиль, Антисемитизм, Политика, Община\",,\"Психология, Бизнесс, Здоровье, Образование\"\n,,,,,,,\n15.00-17.00,,,Заезд и расселение-Зажжение шаббатних свечей до 15:29 Шимон и Зина,,,,\n17.00-18.30,,,Мастерская с Ютой Малах - иудаика (роспись банок),,\"Шимон (Шаббат, недельная глава)\",,Марк Шпунгин\n19.00-20.30,,,Открытие и ужин-Jurmala Hall   Леонид и Шимон и Зина,,,,\n21.00-22.15,,,Зеев Волк  - История Израильского Рока,,Мария Макарова - кино (Dzintari),,Израильские танцы\n22.30-00.00,,,Караоке - Девика,,,,Шахматы\n,,,,,,,\n,,,,,,,\n,,,Шаббат 28.11,,,,\nзалы,,,Bulduri,,Dubulti ,,Ķemeri\n07.30-11.00,,,Завтрак-Ресторан (для проживающих в гостинице),,,,\n8.30-9.30,,,Синагога с Шимоном,,Йога ,,\n9.40-10.55,,,\"Сергей Кравцов\n\"\"Синагоги в Латвии\"\": новая книга\"\"\",,\"Анна Худорожкова\n \"\"Доверять сильнее после ссоры - реально ли это?\"\"\",,Мария Макарова  - Группа крови Биробиджанец\n11.05-11.25,,,POP UP,,\"Роман Голубев \n\"\"Семь раз проверь, один раз отрежь (купи). Статистическая реальность жилого рынка недвижимости Риги и Юрмалы, и что заставляет быть внимательным и осторожным\"\"\",,Гита Умановска\n11.30-12.45,,,Илья Ленский - Зеев Волк - Йосей Кац - Панельня дискусия про Бялика,,Sandra,,\"Любовь Бросалина \n\"\"кто пишет книги знаменитостей на заказ?\"\"\"\n12.50-13.50,,,Обед-Jurmala Hall,,,,\n14.00-15.15,,,ОБЩИННАЯ СЕССИЯ ,,,,\n15.25-16.40,,,\"Rauls Vēliņš\n \"\"Mana ebreju stīga\"\"\",,\"Александр Сокол\n \"\"Беседы с Исааком Израилевичем (ИИ): как более эффективно читать, смотреть и думать\"\"\",,Игорь Липсиц - Капитализм 21 века: что с ним происходит?\n16.50-17.50,,,\"Арина Линданена\n \"\"Vilki Books: больше, чем книжный мгазин. 11 лет предпринимательства в меняющемся мире\"\"\",,Алесандр Слобин  и Сергей Шипоров,,\"Элан Грац и Габриель Шульман \n\"\"LUJS - Еврейский студенческий юнион\"\"\"\n18.00-19.15,,,Ужин - Jurmala Hall + Havdalah,,,,\n19.30-21.15,,,,,\"Александр Сокол и Юлия Сокол\n \"\"Духи и вино: что и как мы выбираем?\"\"\",,Шимон и Зина - Кошерная любовь\n21.30-23.00,,,КОНЦЕРТ,,,,\n23.15-00.00,,,Интелектуальная игра,,Active zone - Game zone ,,\n,,,,,,,\n,,,,,,,\n,,,,,,,\n,,,,,,,\n,,,\"воскр, 29.11\",,,,\n,,,,,,,\n07.30-11.00,,,Завтрак-Ресторан (для проживающих в гостинице),,,,\n09.00-9.45,,,,,,,\n9.30-10.45,,,\"Сергей Кравцов\n\"\"Выездная экскрусия: Синагоги Юрмалы\"\" \n(только по предварительной записи, количество мест ограничено)\",,Моше Захар - софер,,\"Ольга Раевская \n«Зачем нужна пенсия?» \"\n11.00-12.15,,,,,Зина Кутновски Лиак,,Марк Шпунгин \n14.40-15.15,,,Coffee Break-Lounge,,,,\n11.50-13.05,,,\"Анна Керн \n \"\"Как понимать искуство: любовь,желание и эротика\"\"\",,\"Ирина Берлицкая \n\"\"Гельберг- заместитель начальника ледового участка Дороги жизни; оставивший дневники и рисунки\"\"\",,Евгений Гомберг  - История создания книги\n,,,До новых встреч!,,,,";
-const SNAPSHOT_TIME = 1794594469648;
+const SNAPSHOT = ",,,ВЗРОСЛАЯ ПРОГРАММА,,,,\n,,,Seminar ,,,,\n,,,27-29.11,,,,\n,,,\"пятница, 27.11\",,,,\nзалы,,,Bulduri,,Dubulti ,,Ķemeri\n,,,Осим Хаим-вкус жизни /мастерские,,\"Искусство, Иудаизм, История, Израиль, Антисемитизм, Политика, Община\",,\"Психология, Бизнесс, Здоровье, Образование\"\n,,,,,,,\n15.00-17.00,,,Заезд и расселение-Зажжение шаббатних свечей до 15:29 Шимон и Зина,,,,\n17.00-18.30,,,\"Творческая мастерская  \nЮта Малах \",,\"«Возвращение и встреча: Яаков, мы и недельная глава „Ваишлах“»\nВстреча с раввином Шимоном Кутновски-Лиаком\",,\"Бренд и бред: как бороться за внимание в соцсетях (и побеждать)\nМарк Шпунгин\n\"\n19.00-20.30,,,Открытие и ужин-Jurmala Hall   Леонид и Шимон и Зина,,,,\n21.00-22.15,,,\"История израильского рока\nЗеев Волк  \",,\"Кино-показ «Внучка главного врача»: показ документального фильма и дискуссия с режиссером о семейной памяти и наследии Холокоста\n Маша Макарова и Эва Хеллер (зал Dzintari)\",,\"Израильские танцы\nМарианна Трамбарина и Самуэль Гарас\"\n22.30-00.00,,,\"Караоке JAM\nДевика Евсикова\",,,,Активная зона - игры и развлечения\n,,,,,,,\n,,,,,,,\n,,,Шаббат 28.11,,,,\nзалы,,,Bulduri,,Dubulti ,,Ķemeri\n07.30-11.00,,,Завтрак-Ресторан (для проживающих в гостинице),,,,\n8.30-9.30,,,\"Шахарит - Утрення молитва  (поход в юрмальскую синагогу) \nРаввин Шимон Кутновски Ляк\",,\"Выдохнуть и вернуться к себе. Йога для взрослых\nНаталья Казакова \",,\n9.40-10.55,,,\"Синагоги в Латвии: новая книга\nСергей Кравцов\",,\" Доверять сильнее после ссоры - реально ли это?\nАнна Худорожкова\n\",,\"«Группа крови — биробиджанец»: еврейская жизнь, память и идентичность на Дальнем Востоке\nМаша Макарова  \"\n11.05-11.25,,,POP UP,,\"Роман Голубев \n\"\"Семь раз проверь, один раз отрежь (купи). Статистическая реальность жилого рынка недвижимости Риги и Юрмалы, и что заставляет быть внимательным и осторожным\"\"\",,Гита Умановска\n11.30-12.45,,,\"От тель-авивского пляжа к юрмальскому: столпы сионизма посещают Балтию\nИлья Ленский, Зеев Волк, Йосей Кац \",,Сандра Симович ,,\"Любовь Бросалина \n\"\"Кто пишет книги знаменитостей на заказ?\"\"\"\n12.50-13.50,,,Обед-Jurmala Hall,,,,\n14.00-15.15,,,ОБЩИННАЯ СЕССИЯ ,,,,\n15.25-16.40,,,\"Rauls Vēliņš\n \"\"Mana ebreju stīga\"\" (LV)\",,\"Александр Сокол\n \"\"Беседы с Исааком Израилевичем (ИИ): как более эффективно читать, смотреть и думать\"\"\",,Игорь Липсиц - Капитализм 21 века: что с ним происходит?\n16.50-17.50,,,\" Vilki Books: больше, чем книжный мгазин. 11 лет предпринимательства в меняющемся мире\nАрина Линданена\n\",,\"Как создать ресторан, который полюбят гости и отметят эксперты Michelin? \nАлесандр Слобин  и Сергей Шипоров\",,\"\n\"\"LUJS - Еврейский студенческий юнион\"\"\nЭлан Грац и Габриель Шульман \"\n18.00-19.15,,,Ужин - Jurmala Hall + Havdalah,,,,\n19.30-21.15,,,,,\"Духи и вино: что и как мы выбираем?\nАлександр Сокол и Юлия Сокол\n\",,\"«Нехорошо быть человеку одному…» — о любви и близости в паре по Торе.\n\nВстреча-беседа с равом Шимоном и рабанит Сарой-Зиной.\"\n21.30-23.00,,,КОНЦЕРТ,,,,\n23.15-00.00,,,Интелектуальная игра,,Активная зона - игры и развлечения,,\n,,,,,,,\n,,,,,,,\n,,,,,,,\n,,,,,,,\n,,,\"воскр, 29.11\",,,,\n,,,,,,,\n07.30-11.00,,,Завтрак-Ресторан (для проживающих в гостинице),,,,\n09.00-9.45,,,,,,,\n9.30-10.45,,,\"\"\"Выездная экскрусия: Синагоги Юрмалы\"\" \n(только по предварительной записи, количество мест ограничено)\nСергей Кравцов\n\",,\"Torah and Stam \nMoshe Zohar (ENG)\",,\"\nЗачем нужна пенсия?\nОльга Раевская \"\n10:45-12:00,,,,,\"Ритмы близости по Торе: как любить и не терять себя.\nВстреча для женщин с рабанит Сарой-Зиной.\n\",,\"Как я научился не волноваться и полюбить проблему: рекламная стратегия в офисе и дома\nМарк Шпунгин \"\n12:00-13:00,,,Coffee Break-Lounge,,,,\n13:00-14:15,,,\"Анна Керн \n \"\"Как понимать искуство: любовь,желание и эротика\"\"\",,\"Ирина Берлицкая \n\"\"Гельберг- заместитель начальника ледового участка Дороги жизни; оставивший дневники и рисунки\"\"\",,\"Книга \"\"Всадник и другие\"\"\nЕвгений Гомберг  \"\n,,,До новых встреч!,,,,";
+const SNAPSHOT_TRACKS = ",,,,,,,,,,,,,,,,,,,,,,,,,,,,,\n,,\"ОБЯЗАТЕЛЬНОЕ ПОСЕЩЕНИЕ, НЕЛЬЗЯ УЙТИ РАНЬШЕ\",ОПЦИОНАЛЬНОЕ ПОСЕЩЕНИЕ,ОБЩАЯ ПРОГРАММА ГИБУША -  УЧАСТВУЕМ В ВЗРОСЛОЙ ПРОГРАММЕ С РОДИТЕЛЯМИ,,СПЕЦ ОПЦИЯ - ТРЕК - КРОМЕ ОБЩЕЙ ПРОГРАММЫ,,,,,,,,,,,,,,,,,,,,,,,\n,,,,,,,,,,,,,,,,,,,,,,,,,,,,,\nПЯТНИЦА,,,,,,,,,,,,,,,,,,,,,,,,,,,,,\n,,ADULTS,,,,BEYAHAD MINI (3-5 years),,BEYAHAD KIDS (6-12 YEARS),,,,,NOAR LATVIA (13-17 years),,,,,MADRICH UPGRADE,,,,SCHOOL OF MADRICHIM,,,,STUDENTS,,,\n,,BULDURI,DUBULTI ,ĶEMERI,,PUMURI III,,PUMPURI I,,PUMPURI II,,,BULDURI,,DUBULTI ,ĶEMERI,,BULDURI,DUBULTI ,ĶEMERI,,BULDURI,DUBULTI ,ĶEMERI,,BULDURI,DUBULTI ,ĶEMERI,\n15.00-17.00,,Заезд и расселение-Зажжение шаббатних свечей до 15:29 Шимон и Зина\t\t\t\t,,,,,,,,,,,,,,,,,,,,,,,,,,,15.00-17.00\n17.00-18.30,,\"Творческая мастерская  \nЮта Малах \",\"Встреча Шаббата, недельная глава \nРав Шимон Кутновски Ляк \",\"Бренд и бред: как бороться за внимание в соцсетях (и побеждать)\nМарк Шпунгин\n\",,,,ОБЩАЯ ПРОГРАММА ГИБУША -  УЧАСТВУЕМ В ВЗРОСЛОЙ ПРОГРАММЕ С РОДИТЕЛЯМИ,,,,,\"Творческая мастерская  \nЮта Малах \",,\"Встреча Шаббата, недельная глава\nРав Шимон Кутновски Ляк \",\"Бренд и бред: как бороться за внимание в соцсетях (и побеждать)\nМарк Шпунгин\n\",,\"Встреча Шаббата, недельная глава\nРав Шимон Кутновски Ляк \",,,,Мастерская с Ютой - иудаика (роспись банок),\"Встреча Шаббата, недельная глава\nРав Шимон Кутновски Ляк \",,,\"Творческая мастерская  \nЮта Малах \",\"Встреча Шаббата, недельная глава - Х\nРав Шимон Кутновски Ляк \",\"Бренд и бред: как бороться за внимание в соцсетях (и побеждать)\nМарк Шпунгин\n\",17.00-18.30\n19.00-20.30,,Открытие и ужин-Jurmala Hall,,,,,,,,,,,,,,,,,,,,,,,,,,,19.00-20.30\n20.40-21.00,,,,,,,,OPENING & MUSIC GAME,,,,,OPENING (MELLUŽI),,,,,,,,,,,,,Открытие и обсуждение ожиданий,,,20.40-21.00\n21.00-21.30,,\"История израильского рока\nЗеев Волк  \",\"Кино-показ «Внучка главного врача»: показ документального фильма и дискуссия с режиссером о семейной памяти и наследии Холокоста\n Маша Макарова и Эва Хеллер (зал Dzintari)\",\"Израильские танцы\nМарианна Трамбарина и Самуэль Гарас\",,,,,,,,,DETECTIVE EVENING PROGRAM by NOAR LATVIA BOARD (MELLUŽI),,,,,\"Открытие трека.\nСессия \"\"Каждый приносит свое\"\" (DUBULTI)\n\nЛеонид Розенгауз, Вадим Пинегин-Матусов, Юля Белайчук \",,,,DETECTIVE EVENING PROGRAM by NOAR LATVIA BOARD (MELLUŽI),,,,\"История израильского рока\nЗеев Волк  \",\"Кино-показ «Внучка главного врача»: показ документального фильма и дискуссия с режиссером о семейной памяти и наследии Холокоста\n Маша Макарова и Эва Хеллер (зал Dzintari)\",\"Израильские танцы\nМарианна Трамбарина и Самуэль Гарас\",21.00-22:15\n21.30-21.45,,,,,,,,,,,,,,,,,,,,,,,,,,,,,\n21.45-22.00,,,,,,,,,,,,,,,,,,,,,,,,,,,,,\n22.00-22.15,,,,,,,,,,,,,,,,,,,,,,,,,,,,,\n22.30-00.00,,\"Караоке JAM\nДевика Евсикова\",,Шахматы,,,,,,,,,\"Караоке JAM\nДевика Евсикова\",,YC LOUNGE (ASARI I & II),Шахматы,,\"Караоке JAM\nДевика Евсикова\",YC LOUNGE (ASARI I & II),Шахматы,,\"Открытие трека.\nСессия \"\"Пароль\"\" (DUBULTI)\n\nЛеонид Розенгауз, Вадим Пинегин-Матусов, Юля Белайчук\",,,,\"Караоке JAM\nДевика Евсикова\",,Шахматы,22.30-00.00\n,,,,,,,,,,,,,,,,,,,,,,,,,,,,,\nСУББОТА,,,,,,,,,,,,,,,,,,,,,,,,,,,,,\n,,ADULTS,,,,BEYAHAD MINI (3-5 years),,BEYAHAD KIDS (6-12 YEARS),,,,,NOAR LATVIA (13-17 years),,,,,MADRICH UPGRADE,,,,SCHOOL OF MADRICHIM,,,,STUDENTS,,,\nзалы,,BULDURI,DUBULTI ,ĶEMERI,,PUMURI III,,PUMPURI I,,PUMPURI II,,,BULDURI,,DUBULTI ,ĶEMERI,,BULDURI,DUBULTI ,ĶEMERI,,BULDURI,DUBULTI ,ĶEMERI,,BULDURI,DUBULTI ,ĶEMERI,залы\n07.30-10.30,,Завтрак-Ресторан (для проживающих в гостинице),,,,,,,,,,,,,,,,,,,,,,,,,,,07.30-10.30\n8.30-9.30,,\"Шахарит - Утрення молитва  (поход в юрмальскую синагогу) \nРаввин Шимон Кутновски Ляк\",\"Выдохнуть и вернуться к себе. Йога для взрослых\nНаталья Казакова \",,,,,BOKER TOV: Wake Up & Move! (09:00-09:30),,,,,Тут ничего у них завтрак и потом йога первая программа,,,,,\"Шахарит - Утрення молитва  (поход в юрмальскую синагогу) \nРаввин Шимон Кутновски Ляк\",,,,\"Шахарит - Утрення молитва  (поход в юрмальскую синагогу) \nРаввин Шимон Кутновски Ляк\",,,,\"Шахарит - Утрення молитва  (поход в юрмальскую синагогу) \nРаввин Шимон Кутновски Ляк\",\"Выдохнуть и вернуться к себе. Йога для взрослых\nНаталья Казакова \",,8.45-9.30\n9.40-10.00,,\"Синагоги в Латвии: новая книга\nСергей Кравцов\n\",\" Доверять сильнее после ссоры - реально ли это?\nАнна Худорожкова\n\",\"«Группа крови — биробиджанец»: еврейская жизнь, память и идентичность на Дальнем Востоке\nМаша Макарова  \",,,,,,,,,YOGA BY NATALIE KAZAKOVA (MELLUŽI),,,,,\"Тимбилдинг \"\"Другой рядом\"\"\nЛеонид Розенгауз\",,,,\"Сессия «Как? Мы? Учимся?»\nВедущая: Мара Гутшабаш.\n\",,,,\"Синагоги в Латвии: новая книга\nСергей Кравцов\n\",\" Доверять сильнее после ссоры - реально ли это?\nАнна Худорожкова\n\",\"«Группа крови — биробиджанец»: еврейская жизнь, память и идентичность на Дальнем Востоке\nМаша Макарова  \",9.40-10.00\n10.00-10.45,,,,,,,,PEULA: Еврейство через 100 лет,,PEULA: Еврейство через 100 лет,,,\"Давид Липкин- Конфликт между Израилем и Палестиной ( без агитации люой повестик) Сабина не против, свяжется с Давидом сама, только после сможем получить ответ и тогда поймем)\",,,,,,,,,,,,,,,,10.00-10.45\n10.45-10.55,,,,,,,,,,,,,,,,,,,,,,,,,,,,,10.45-10.55\n11.05-11.25,,POP UP,\"Роман Голубев \n\"\"Семь раз проверь, один раз отрежь (купи). Статистическая реальность жилого рынка недвижимости Риги и Юрмалы, и что заставляет быть внимательным и осторожным\"\"\",Гита Умановска,,,,YOGA TIME with Natalie Kazakova,,,,,,,,,,POP UP,\"Роман Голубев \n\"\"Семь раз проверь, один раз отрежь (купи). Статистическая реальность жилого рынка недвижимости Риги и Юрмалы, и что заставляет быть внимательным и осторожным\"\"\",Гита Умановска,,POP UP,\"Роман Голубев \n\"\"Семь раз проверь, один раз отрежь (купи). Статистическая реальность жилого рынка недвижимости Риги и Юрмалы, и что заставляет быть внимательным и осторожным\"\"\",Гита Умановска,,POP UP,\"Роман Голубев \n\"\"Семь раз проверь, один раз отрежь (купи). Статистическая реальность жилого рынка недвижимости Риги и Юрмалы, и что заставляет быть внимательным и осторожным\"\"\",Гита Умановска,11.05-11.25\n\"11.30-11.25\n\",,Илья Ленский - Зеев Волк - Йосей Кац - Панельня дискусия про Бялика,Сандра Симович ,\"Любовь Бросалина \n\"\"кто пишет книги знаменитостей на заказ?\"\"\",,,,,,,,,,,,,,\"Сессия \"\"Что делают дети в лагере?!\"\"\nМара Гутшабаш\",,,,\"Еврейский календарь \nРаввин Шимон Кутновски Ляк\",,,,Илья Ленский - Зеев Волк - Йосей Кац - Панельня дискусия про Бялика,Сандра Симович ,\"Любовь Бросалина \n\"\"кто пишет книги знаменитостей на заказ?\"\"\",\"11.30-12.45\n\"\n11.25-11.45,,,,,,,,,,,,,,,,,,,,,,,,,,,,,\n11.45-11.55,,,,,,,,,,,,,,,,,,,,,,,,,,,,,\n11.55-12.05,,,,,,,,J-TALK,,,,,\"SINGING WITH MARTA (35 eur) чуть ждем, Марта скорее всего будет и в большем задействована, поэтому как бы она с нами, но ждём финального ок\",,,,,,,,,,,,,,,,\n12.05-12.25,,,,,,,,,,,,,,,,,,,,,,,,,,,,,\n12.25-12.45,,,,,,,,,,,,,,,,,,,,,,,,,,,,,\n12.50-13.50,,Обед-Юрмала Холл,,,,,,,,,,,,,,,,,,,,,,,,,,,12.50-13.50\n14.00-15.00,,ОБЩИННАЯ СЕССИЯ ,,,,,,\"LET'S SING TOGETHER with Marta (35 eur) чуть ждем, Марта скорее всего будет и в большем задействована, поэтому как бы она с нами, но ждём финального ок\",,,,,ОБЩИННАЯ СЕССИЯ ,,,,,ОБЩИННАЯ СЕССИЯ ,,,,ОБЩИННАЯ СЕССИЯ ,,,,ОБЩИННАЯ СЕССИЯ ,,,14.00-15.15\n15.00-15.15,,,,,,,,LOUNGE: Chill & Play ,,,,,,,,,,,,,,,,,,,,,\n15.15-15.25,,,,,,,,,,,,,,,,,,,,,,,,,,,,,\n15.25-15.35,,\"Rauls Vēliņš\n \"\"Mana ebreju stīga\"\" \",\"Александр Сокол\n \"\"Беседы с Исааком Израилевичем (ИИ): как более эффективно читать, смотреть и думать\"\"\",Игорь Липсиц - Капитализм 21 века: что с ним происходит?,,,,,,,,,,,,,,,,,,,,,,\"Rauls Vēliņš\n \"\"Mana ebreju stīga\"\" \",\"Александр Сокол\n \"\"Беседы с Исааком Израилевичем (ИИ): как более эффективно читать, смотреть и думать\"\"\",Игорь Липсиц - Капитализм 21 века: что с ним происходит?,\n15.35-16.40,,,,,,,,JEWISH DANCES  with Mariana ,,,,,,,,,,\"Сессия \"\"Что мы делаем в лагере?!\"\"\nМара Гутшабаш\",,,,\"Сессия \"\"Арт-мастерская Марка Ротко\"\"\nЛеонид Розенгауз\",,,,,,,15.25-16.40\n16.40-16.50,,,,,,,,ART: Мозаика своими руками with Nastya,,,,,,,,,,,,,,,,,,,,,\n16.50-17.10,,\" Vilki Books: больше, чем книжный мгазин. 11 лет предпринимательства в меняющемся мире\nАрина Линданена\n\",Алесандр Слобин  и Сергей Шипоров,\"Элан Грац и Габриель Шульман \n\"\"LUJS - Еврейский студенческий юнион\"\"\",,,,,,,,,\" Vilki Books: больше, чем книжный мгазин. 11 лет предпринимательства в меняющемся мире\nАрина Линданена\n\",,Алесандр Слобин  и Сергей Шипоров,\"Элан Грац и Габриель Шульман \n\"\"LUJS - Еврейский студенческий юнион\"\"\",,\" Vilki Books: больше, чем книжный мгазин. 11 лет предпринимательства в меняющемся мире\nАрина Линданена\n\",Алесандр Слобин  и Сергей Шипоров,\"Элан Грац и Габриель Шульман \n\"\"LUJS - Еврейский студенческий юнион\"\"\",,\" Vilki Books: больше, чем книжный мгазин. 11 лет предпринимательства в меняющемся мире\nАрина Линданена\n\",Алесандр Слобин  и Сергей Шипоров,\"Элан Грац и Габриель Шульман \n\"\"LUJS - Еврейский студенческий юнион\"\"\",,\" Vilki Books: больше, чем книжный мгазин. 11 лет предпринимательства в меняющемся мире\nАрина Линданена\n\",Алесандр Слобин  и Сергей Шипоров,\"Элан Грац и Габриель Шульман \n\"\"LUJS - Еврейский студенческий юнион\"\"\",16.50-17.10\n17.10-17.20,,,,,,,,,,,,,,,,,,,,,,,,,,,,,17.10-17.20\n17.20-17.30,,,,,,,,,,,,,,,,,,,,,,,,,,,,,17.20-17.30\n17.30-17.50,,,,,,,,,,,,,,,,,,,,,,,,,,,,,17.30-17.50\n17.50-18.00,,,,,,,,,,,,,,,,,,,,,,,,,,,,,17.50-18.00\n18.00-19.15,,Ужин - Jurmala Hall,,,,,,,,,,,,,,,,,,,,,,,,,,,18.00-19.15\n19.20-19.30,,,,,,,,MADRICH TIME,,,,,,,,,,,,,,,,,,,,,19.20-19.30\n19.30-19.45,,,\"Духи и вино: что и как мы выбираем?\nАлександр Сокол и Юлия Сокол\n\",Шимон и Зина - Кошерная любовь,,,,,,,,,,,,,,LUJS Quiz program,,,,\"19:30-20:30\nСессия \"\"Сложные письма\"\"\nЛеонид Розенгауз\",,,,LUJS Quiz program,,,19.30-21.15\n19.45-20.00,,,,,,,,,,,,,,,,,,,,,,,,,,,,,\n20.00-20.45,,,,,,,,MOVIE NIGHT: The Prince of Egypt (20:00-21:45),,,,,,,,,,,,,,,,,,,,,\n20.45-21.15,,,,,,,,,,,,,,,,,,,,,,\"20:30-21:15\nКак устроен бетахон?\",,,,,,,\n21.05-21.30,,,,,,,,,,,,,,,,,,,,,,,,,,,,,21.05-21.30\n21.30-23.00,,КОНЦЕРТ,,,,,,,,,,,КОНЦЕРТ,,,,,КОНЦЕРТ,,,,КОНЦЕРТ,,,,КОНЦЕРТ,,,21.30-23.00\n23.15-00.00,,Интелектуальная игра,Active zone - Game zone ,,,,,,,,,,Интелектуальная игра,,Active zone - Game zone ,YC LOUNGE (ASARI I & II),,SOM & MADRICH PROGRAM,,,,SOM & MADRICH PROGRAM,,,,Интелектуальная игра,Active zone - Game zone ,,23.15-00.00\n00.00-1.15,,,,,,,,,,,,,,,,,,,,,,,,,,,,,00.00-1.15\n,,,,,,,,,,,,,,,,,,,,,,,,,,,,,\nВОСКРЕСЕНЬЕ,,,,,,,,,,,,,,,,,,,,,,,,,,,,,\n,,ADULTS,,,,BEYAHAD MINI (3-5 years),,BEYAHAD KIDS (6-12 YEARS),,,,,NOAR LATVIA (13-17 years),,,,,MADRICH UPGRADE,,,,SCHOOL OF MADRICHIM,,,,STUDENTS,,,\n,,BULDURI,DUBULTI ,ĶEMERI,,PUMURI III,,PUMPURI I,,PUMPURI II,,,BULDURI,,DUBULTI ,ĶEMERI,,BULDURI,DUBULTI ,ĶEMERI,,BULDURI,DUBULTI ,ĶEMERI,,BULDURI,DUBULTI ,ĶEMERI,\n07.30-11.00,,Завтрак-Ресторан (для проживающих в гостинице),,,,,,,,,,,,,,,,,,,,,,,,,,,07.30-11.00\n9.00-9.30,,,,,,,,BOKER TOV: Wake Up & Move! (9:00-9:30),,,,,,,,,,,,,,,,,,,,,\n9.30-10.00,,\"\"\"Выездная экскрусия: Синагоги Юрмалы\"\" \n(только по предварительной записи, количество мест ограничено)\nСергей Кравцов\n\",\"Torah and Stam \nMoshe Zohar (ENG)\",\"Зачем нужна пенсия?\nОльга Раевская \",,,,PEULA: Еврейские суперспособности (9:35-10:30),,PEULA: Еврейские суперспособности (9:35-10:30),,,Зарядка в бассейне с Кристианом или не в бассейне с адель  9:45 до 11:00 ,,,,,\"Сессия \"\"Арт-мастерская Марка Ротко\"\"\nЛеонид Розенгауз\",,,,\"ADULT PROGRAM:\nTorah and Stam \nMoshe Zohar (ENG)\",,,,Фидбек и обсуждение идей,,,9.55-11.10\n10.00-10.45,,,,,,,,,,,,,,,,,,,,,,,,,,,,,\n10.45-11.15,,,\"Ритмы близости по Торе: как любить и не терять себя.\nВстреча для женщин с рабанит Сарой-Зиной.\n\",\"Как я научился не волноваться и полюбить проблему: рекламная стратегия в офисе и дома\nМарк Шпунгин \",,,,ART: Создай свой витраж with Nastya(10:40-11:50),,,,,,,,,,,,,,TBC,,,,,,,\n11.15-12.00,,,,,,,,,,,,,,,,,,,,,,,,,,,,,\n12.00-13.00,,Coffee Break-Lounge,,,,,,,,,,,,,,,,,,,,,,,,,,,14.40-15.15\n13.00-14.15,,\"Анна Керн \n \"\"Как понимать искуство: любовь,желание и эротика\"\"\",\"Ирина Берлицкая \n\"\"Гельберг- заместитель начальника ледового участка Дороги жизни; оставивший дневники и рисунки\"\"\",\"Книга \"\"Всадник и другие\"\"\nЕвгений Гомберг  \",,,,GAMES WITH MADRICHIM (13:00/13:30-14:00/14:30),,,,,,,,,,,,,,\"Фидбек и закрытие\n\",,,,,,,11.10-11.20\n,,,,,,,,,,,,,Общинный трек,,,,,,,,,,,,,,,,11.20-11.40\n,,,,,,,,\"АКТЕРСКОЕ МАСТЕРСТВО ХОТИМ (12:00-13:30, можно и до 13:00/ зависит от человека)\",,,,,,,,,,,,,,,,,,,,,11.50-13.05\n,,,,,,,,,,,,,,,,,,,,,,,,,,,,,\n,,,,,,,,,,,,,,,,,,,,,,,,,,,,,\n,,,,,,,,,,,,,Денисс Чамов -Ивестиции c 12:30 до 14:00,,,,,,,,,,,,,,,,\n,,,,,,,,,,,,,,,,,,\"Фидбек и закрытие\n\",,,,,,,,Релакс тайм,,,13.15-14.00\n,,,,,,,,CLOSING,,,,,CLOSING,,,,,,,,,,,,,,,,14.00-14.30\n,,До новых встреч!,,,,,,,,,,,,,,,,,,,,,,,,,,,";
+const SNAPSHOT_TIME = 1795158444603;
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -210,7 +219,7 @@ const WD_FULL = ['воскресенье','понедельник','вторни
 const plural = (n, f) => f[(n % 10 === 1 && n % 100 !== 11) ? 0 : (n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20)) ? 1 : 2];
 const fmt = m => { m = ((m % 1440) + 1440) % 1440; return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); };
 
-const state = { days: [], halls: [], news: [], info: [], sel: null, hall: 'all', q: '', searching: false,
+const state = { days: [], halls: [], tracks: [], track: 'adults', news: [], info: [], sel: null, hall: 'all', q: '', searching: false,
   updated: null, offline: false, changes: {}, showPast: false, open: new Set(), userPickedDay: false, firstScroll: true };
 
 /* ---------- CSV ---------- */
@@ -316,6 +325,169 @@ function makeItem(day, start, end, hall, raw) {
     common: !hall, brk: !hall && BREAK_RE.test(raw) };
 }
 
+/* ---------- Параллельные треки (лист YC Gibush program 2026) ---------- */
+const TRACK_NAMES = [
+  [/adult/i, 'adults', 'Взрослые'], [/mini/i, 'mini', 'Малыши 3–5'], [/kids/i, 'kids', 'Дети 6–12'],
+  [/noar/i, 'noar', 'Подростки 13–17'], [/upgrade/i, 'mu', 'Madrich Upgrade'],
+  [/school/i, 'som', 'Школа мадрихов'], [/student/i, 'students', 'Студенты']
+];
+// рабочие пометки: такие ячейки не показываем, пока организаторы их не уберут
+const HIDE_RE = /жд[её]м|хотим|\btbc\b|не против|свяжется|тут ничего|поймем|поймём|согласов|\d{1,2}[:.]\d{2}\s*\//i;
+const JOIN_RE = /участвуем\s+во?\s+взросл/i;
+const WEEKDAY_RE = /^(пятн|субб|шаб|воскр|понед|вторн|сред|четв)/i;
+const titleCase = s => s.toLowerCase().replace(/(^|\s)(\S)/g, (m, a, b) => a + b.toUpperCase()).replace(/(^|\s)(i{1,3}|iv|v)(?=\s|$)/gi, (m, a, b) => a + b.toUpperCase());
+const stems = s => new Set((s.toLowerCase().match(/[a-zа-яёā-ž]{4,}/g) || []).map(w => w.slice(0, 5)));
+const normT = s => s.toLowerCase().replace(/[^a-zа-яёā-ž0-9]/g, '');
+function sim(a, b) {
+  if (normT(a) && normT(a) === normT(b)) return 1;
+  const A = stems(a), B = stems(b); if (!A.size || !B.size) return 0;
+  let n = 0; A.forEach(w => { if (B.has(w)) n++; });
+  return n / Math.min(A.size, B.size);
+}
+function explicitTime(t) {
+  const m = t.match(/(\d{1,2})[:.](\d{2})\s*(?:-|–|—|до)\s*(\d{1,2})[:.](\d{2})/);
+  if (!m) return null;
+  const s = +m[1] * 60 + +m[2]; let e = +m[3] * 60 + +m[4]; if (e <= s) e += 1440;
+  return { s, e, str: m[0] };
+}
+function stripTime(t, str) {
+  const i = t.indexOf(str); if (i < 0) return t;
+  let a = i, b = i + str.length;
+  const before = t.slice(0, a), after = t.slice(b);
+  const ob = before.match(/\(\s*(?:[cс]\s*)?$/), cb = after.match(/^\s*\)/);
+  if (ob && cb) { a -= ob[0].length; b += cb[0].length; }
+  else { const c = before.match(/(?:^|\s)[cс]\s*$/); if (c) a -= c[0].length; }
+  return (t.slice(0, a) + t.slice(b)).replace(/[ \t]{2,}/g, ' ').trim();
+}
+function parseTracks(rows, adultDays) {
+  if (!rows.length || !adultDays.length) return [];
+  const adultHalls = new Set(state.halls.map(h => h.name.toLowerCase()));
+  const colCount = Math.max(...rows.map(r => r.length));
+  const timeCols = new Set();
+  for (let c = 1; c < colCount; c++) { let k = 0; rows.forEach(r => { if (/^\s*\d{1,2}[.:]\d{2}\s*-/.test(r[c] || '')) k++; }); if (k >= 3) timeCols.add(c); }
+  const tracks = new Map();
+  let groups = null, sub = null, subRow = -1, dayIdx = -1;
+  rows.forEach((r, i) => {
+    const cells = r.map(c => (c || '').replace(/\t+/g, ' ').trim());
+    const a = cells[0] || '';
+    if (WEEKDAY_RE.test(a) && !TIME_RE.test(a)) { dayIdx++; return; }
+    const hdr = cells.map((c, j) => ({ c, j })).filter(x => x.j > 0 && x.c && x.c.length < 40 && !timeCols.has(x.j) && TRACK_NAMES.some(t => t[0].test(x.c)));
+    if (new Set(hdr.map(x => TRACK_NAMES.find(t => t[0].test(x.c))[1])).size >= 3) {
+      groups = hdr.map((x, k) => {
+        const tn = TRACK_NAMES.find(t => t[0].test(x.c));
+        return { id: tn[1], name: tn[2], start: x.j, end: k + 1 < hdr.length ? hdr[k + 1].j - 1 : x.j + 3 };
+      });
+      subRow = i + 1; return;
+    }
+    if (i === subRow) { sub = cells; return; }
+    const day = adultDays[dayIdx];
+    if (!groups || !day) return;
+    const tm = a.match(TIME_RE);
+    let rowS = null, rowE = null;
+    if (tm) { rowS = +tm[1] * 60 + +tm[2]; rowE = +tm[3] * 60 + +tm[4]; if (rowE <= rowS) rowE = rowE + 1440 - rowS <= 360 ? rowE + 1440 : null; }
+    groups.forEach(g => {
+      if (g.id === 'adults') return;
+      if (!tracks.has(g.id)) tracks.set(g.id, { id: g.id, name: g.name, pending: [], refs: new Set(), join: [], hasHalls: false });
+      const t = tracks.get(g.id);
+      for (let c = g.start; c <= g.end; c++) {
+        const subName = sub ? (sub[c] || '').trim() : '';
+        const hallCol = adultHalls.has(subName.toLowerCase());
+        if (hallCol) t.hasHalls = true;
+        const raw = cells[c];
+        if (!raw || timeCols.has(c) || HIDE_RE.test(raw)) continue;
+        let text = raw;
+        const ex = explicitTime(text);
+        const s = ex ? ex.s : rowS;
+        if (s === null) continue;
+        if (ex) text = stripTime(text, ex.str);
+        // взрослая сессия, на которую идёт трек
+        let best = null, bs = 0;
+        day.items.forEach(it => { if (it.start <= s && s < it.end) { const v = sim(text, it.raw); if (v > bs) { bs = v; best = it; } } });
+        if (best && bs >= 0.5) { t.refs.add(best); continue; }
+        if (JOIN_RE.test(text)) { t.join.push({ day, s, e: ex ? ex.e : (rowE || s + 90) }); continue; }
+        let e = ex ? ex.e : null;
+        if (e === null && hallCol) { const slot = day.items.find(it => it.start === s); if (slot) e = slot.end; }
+        if (e === null && rowE !== null && rowE - s >= 30) e = rowE;
+        let place = '';
+        const pm = text.match(/\(([A-ZĀ-Ž][A-ZĀ-Ž&\s]{3,})\)/);
+        if (pm && !/^(ENG|RUS|LAT)$/.test(pm[1].trim())) { place = titleCase(pm[1].trim()); text = text.replace(pm[0], '').trim(); }
+        else if (subName && !hallCol) place = '#' + titleCase(subName);
+        t.pending.push({ day, s, e, rowE, text, col: c, place });
+      }
+    });
+  });
+  const out = [{ id: 'adults', name: 'Взрослые', own: [] }];
+  for (const t of tracks.values()) {
+    // объединяем одинаковые ячейки (одна сессия в двух комнатах)
+    const merged = [];
+    t.pending.forEach(p => {
+      const m = merged.find(x => x.day === p.day && x.s === p.s && normT(x.text) === normT(p.text));
+      if (m) { if (p.place && !m.places.includes(p.place)) m.places.push(p.place); }
+      else merged.push({ ...p, places: p.place ? [p.place] : [] });
+    });
+    // комната из шапки: при одной колонке (объединённые ячейки) пишем без номера
+    merged.forEach(m => { m.places = m.places.length === 1 && m.places[0][0] === '#' ? [m.places[0].slice(1).replace(/\s+[IVX]+$/, '')] : m.places.map(x => x.replace(/^#/, '')); });
+    const seenStart = {};
+    t.own = merged.map(p => {
+      const sk = p.day.num + ':' + p.s; const k = seenStart[sk] = (seenStart[sk] || 0) + 1;
+      let e = p.e;
+      if (e === null) {
+        const nexts = [...merged.filter(x => x.day === p.day && x.s > p.s).map(x => x.s),
+          ...[...t.refs].filter(it => it.day === p.day && it.start > p.s).map(it => it.start),
+          ...p.day.items.filter(it => it.common && it.start > p.s).map(it => it.start)];
+        e = nexts.length ? Math.min(...nexts) : (p.rowE || p.s + 60);
+      }
+      const it = makeItem(p.day, p.s, e, null, p.text);
+      Object.assign(it, { common: false, brk: false, own: true, place: p.places.join(', '), key: `${p.day.d}.${p.day.m}|${t.id}|${p.s}|${k}` });
+      return it;
+    });
+    if (!t.own.length) continue;
+    t.byDay = new Map();
+    adultDays.forEach(d => {
+      const set = new Set(d.items.filter(it => it.common));
+      t.refs.forEach(it => { if (it.day === d) set.add(it); });
+      const own = t.own.filter(it => it.day === d);
+      t.join.filter(j => j.day === d).forEach(j => {
+        const b = makeItem(d, j.s, j.e, null, 'Вместе с родителями во взрослой программе');
+        Object.assign(b, { own: true, key: `${d.d}.${d.m}|${t.id}|join|${j.s}` }); own.push(b);
+        d.items.forEach(it => { if (it.hall && it.start < j.e && it.end > j.s) set.add(it); });
+      });
+      if (t.hasHalls) {
+        // в свободные от своих сессий слоты — взрослые лекции на выбор
+        slotsOf(d.items.filter(it => it.hall)).forEach(sl => {
+          const busy = own.some(o => o.start < sl.end && o.end > sl.start) || sl.items.some(it => set.has(it));
+          if (!busy) sl.items.forEach(it => set.add(it));
+        });
+      }
+      const list = [...set, ...own];
+      const ord = it => it.hall ? 1 + (state.halls.find(h => h.name === it.hall) || { idx: 0 }).idx : it.own ? 10 : 0;
+      list.sort((x, y) => x.start - y.start || ord(x) - ord(y));
+      t.byDay.set(d.num, list);
+    });
+    out.push({ id: t.id, name: t.name, own: t.own, byDay: t.byDay });
+  }
+  return out.length > 1 ? out : [];
+}
+function itemsFor(day) {
+  const t = state.tracks.find(x => x.id === state.track);
+  return t && t.byDay ? (t.byDay.get(day.num) || []) : day.items;
+}
+const trackName = () => (state.tracks.find(x => x.id === state.track) || { name: '' }).name;
+function renderTracks() {
+  const el = $('#tracks');
+  if (!state.tracks.length) { el.hidden = true; return; }
+  el.hidden = false;
+  el.innerHTML = state.tracks.map(t => `<button class="trk" data-track="${t.id}" aria-pressed="${t.id === state.track}">${esc(t.name)}</button>`).join('');
+  el.querySelectorAll('.trk').forEach(b => b.onclick = () => setTrack(b.dataset.track));
+}
+function setTrack(id) {
+  state.track = id; state.wantTrack = id; state.showPast = false; state.open.clear();
+  store('gib-track', id);
+  try { history.replaceState(null, '', id === 'adults' ? location.pathname + location.search : '#' + id); } catch (e) {}
+  renderTracks(); renderHalls(); renderNow(); renderList();
+  const b = document.querySelector(`.trk[data-track="${id}"]`); if (b) b.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
 /* ---------- Описания и объявления ---------- */
 function headerIdx(rows, tests) {
   if (!rows.length) return null;
@@ -362,6 +534,7 @@ const absEnd = it => it.day.num * 1440 + it.end;
 const BASE = `https://docs.google.com/spreadsheets/d/${CONFIG.sheetId}`;
 const URLS = {
   program: () => `${BASE}/export?format=csv&gid=${CONFIG.programGid}&_=${Date.now()}`,
+  tracks: () => `${BASE}/export?format=csv&gid=${CONFIG.tracksGid}&_=${Date.now()}`,
   news: () => `${BASE}/gviz/tq?tqx=out:csv&headers=1&sheet=${encodeURIComponent(CONFIG.newsSheet)}&_=${Date.now()}`,
   info: () => `${BASE}/gviz/tq?tqx=out:csv&headers=1&sheet=${encodeURIComponent(CONFIG.infoSheet)}&_=${Date.now()}`
 };
@@ -374,31 +547,38 @@ let loading = false;
 async function load() {
   if (loading) return; loading = true;
   try {
-    const [p, n, i] = await Promise.allSettled([getText(URLS.program()), getText(URLS.news()), getText(URLS.info())]);
+    const [p, n, i, y] = await Promise.allSettled([getText(URLS.program()), getText(URLS.news()), getText(URLS.info()), getText(URLS.tracks())]);
     if (p.status !== 'fulfilled') throw p.reason;
     const prev = store('gib-cache');
-    const data = { p: p.value, n: n.status === 'fulfilled' ? n.value : (prev ? prev.n : ''), i: i.status === 'fulfilled' ? i.value : (prev ? prev.i : ''), t: Date.now() };
+    const data = { p: p.value, n: n.status === 'fulfilled' ? n.value : (prev ? prev.n : ''), i: i.status === 'fulfilled' ? i.value : (prev ? prev.i : ''), y: y.status === 'fulfilled' ? y.value : (prev ? prev.y : ''), t: Date.now() };
     if (!apply(data, false)) throw new Error('empty');
     store('gib-cache', data);
   } catch (e) {
     state.offline = true; renderFooter();
   } finally { loading = false; }
 }
-function apply(data, offline) {
+function apply(data, offline, fallback) {
   const days = parseProgram(parseCSV(data.p));
   if (!days.length) return false;
   state.days = days; state.news = parseNews(data.n); state.info = parseInfo(data.i);
   state.updated = data.t; state.offline = offline;
-  const n = diff(days);
+  try { state.tracks = parseTracks(parseCSV(data.y || ''), days); } catch (e) { state.tracks = []; }
+  const want = state.wantTrack || state.track;
+  state.track = state.tracks.some(t => t.id === want) ? want : 'adults';
+  // встроенная копия — не повод показывать «изменения» новому посетителю
+  const n = fallback ? (state.changes = store('gib-chg') || {}, 0) : diff([...days.flatMap(d => d.items), ...state.tracks.flatMap(t => t.own)]);
   if (!state.sel || !days.some(d => d.num === state.sel)) state.sel = pickDay();
   render();
   if (n > 0) toast(`Расписание обновилось: ${n} ${plural(n, ['изменение', 'изменения', 'изменений'])}`);
   return true;
 }
-function diff(days) {
-  const cur = {}; days.forEach(d => d.items.forEach(it => cur[it.key] = it.raw));
+function diff(items) {
+  const cur = {}; items.forEach(it => cur[it.key] = it.raw);
   const prev = store('gib-snap'); const chg = store('gib-chg') || {}; const now = Date.now(); let n = 0;
-  if (prev) for (const k in cur) if (prev[k] !== cur[k]) { chg[k] = now; n++; }
+  // новая строка считается изменением, только если этот трек уже был в прошлой версии
+  const seg = k => k.split('|')[1];
+  const prevSegs = new Set(prev ? Object.keys(prev).map(seg) : []);
+  if (prev) for (const k in cur) if (prev[k] !== cur[k] && (k in prev || prevSegs.has(seg(k)))) { chg[k] = now; n++; }
   for (const k in chg) if (now - chg[k] > CONFIG.changeBadgeHours * 3600e3 || !(k in cur)) delete chg[k];
   store('gib-snap', cur); store('gib-chg', chg); state.changes = chg;
   return n;
@@ -427,7 +607,7 @@ function hallLabel(name) {
   return `<span class="hl" style="color:${s.t}"><span class="sq" style="background:${s.sq}"></span>${esc(name)}</span>`;
 }
 function render() {
-  renderStatus(); renderNews(); renderDays(); renderHalls(); renderNow(); renderList(); renderFooter();
+  renderStatus(); renderNews(); renderTracks(); renderDays(); renderHalls(); renderNow(); renderList(); renderFooter();
   requestAnimationFrame(() => document.documentElement.style.setProperty('--barh', ($('#bar').offsetHeight + 8) + 'px'));
 }
 function renderStatus() {
@@ -469,9 +649,12 @@ function renderDays() {
   });
 }
 function renderHalls() {
+  const showHalls = state.days.some(d => itemsFor(d).some(it => it.hall));
+  $('#halls').style.visibility = showHalls ? '' : 'hidden';
+  if (!showHalls) state.hall = 'all';
   const chips = [{ name: 'all', label: 'Все' }, ...state.halls.map(h => ({ name: h.name, label: h.name }))];
   $('#halls').innerHTML = chips.map(c => `<button class="chip" data-hall="${esc(c.name)}" aria-pressed="${state.hall === c.name}">${c.name === 'all' ? '' : `<span class="sq" style="background:${hallStyle(c.name).sq}"></span>`}${esc(c.label)}</button>`).join('');
-  document.querySelectorAll('.chip').forEach(b => b.onclick = () => { state.hall = b.dataset.hall; renderHalls(); renderList(); });
+  document.querySelectorAll('#halls .chip').forEach(b => b.onclick = () => { state.hall = b.dataset.hall; renderHalls(); renderList(); });
   const h = state.halls.find(x => x.name === state.hall);
   const note = $('#hallnote'); note.hidden = !(h && h.theme);
   if (h && h.theme) note.innerHTML = `<b>${esc(h.name)}:</b> ${esc(h.theme)}`;
@@ -484,7 +667,7 @@ function card(it, now) {
   const desc = descFor(it); const changed = state.changes[it.key];
   const open = state.open.has(it.key);
   const cls = ['card', it.common ? 'common' : '', it.brk ? 'brk' : ''].join(' ');
-  const top = (it.hall || changed) ? `<div class="card-top">${hallLabel(it.hall) || '<span></span>'}${changed ? '<span class="badge">Изменено</span>' : ''}</div>` : '';
+  const top = (it.hall || it.place || changed) ? `<div class="card-top">${hallLabel(it.hall) || (it.place ? `<span class="place">${esc(it.place)}</span>` : '<span></span>')}${changed ? '<span class="badge">Изменено</span>' : ''}</div>` : '';
   const inner = `${top}${it.speaker ? `<div class="speaker">${esc(it.speaker)}</div>` : ''}<h3 class="title">${esc(it.title)}</h3>${it.sub ? `<div class="speaker">${esc(it.sub)}</div>` : ''}${it.note ? `<div class="note">${esc(it.note)}</div>` : ''}${desc ? (open ? `<div class="desc">${esc(desc)}</div>` : '<div class="more">Подробнее</div>') : ''}`;
   return desc ? `<button class="${cls}" data-key="${esc(it.key)}" aria-expanded="${open}">${inner}</button>` : `<article class="${cls}">${inner}</article>`;
 }
@@ -505,7 +688,7 @@ function renderList() {
     const q = state.q.trim().toLowerCase();
     let html = '', total = 0;
     state.days.forEach(d => {
-      const its = d.items.filter(it => matches(it) && (it.raw + ' ' + (it.hall || '') + ' ' + descFor(it)).toLowerCase().includes(q));
+      const its = itemsFor(d).filter(it => matches(it) && (it.raw + ' ' + (it.hall || '') + ' ' + descFor(it)).toLowerCase().includes(q));
       if (!its.length) return; total += its.length;
       html += `<div class="dayhead">${cap(WD_FULL[d.wd])}, ${d.d} ${MONTHS[d.m - 1]}</div>` + slotsOf(its).map(s => slotHTML(s, now)).join('');
     });
@@ -513,7 +696,7 @@ function renderList() {
     bindCards(); return;
   }
   const day = state.days.find(d => d.num === state.sel); if (!day) { el.innerHTML = ''; return; }
-  const slots = slotsOf(day.items.filter(matches));
+  const slots = slotsOf(itemsFor(day).filter(matches));
   const pastSlots = slots.filter(s => day.num * 1440 + s.end <= now.abs);
   const isToday = pastSlots.length && pastSlots.length < slots.length;
   let html = '';
@@ -532,14 +715,14 @@ function bindCards() {
 }
 function renderNow() {
   const el = $('#now'); const now = nowInfo();
-  const all = state.days.flatMap(d => d.items);
+  const all = state.days.flatMap(d => itemsFor(d));
   const live = all.filter(it => absStart(it) <= now.abs && now.abs < absEnd(it) && !(it.brk && all.some(o => o !== it && !o.brk && absStart(o) <= now.abs && now.abs < absEnd(o))));
   const upcoming = all.filter(it => absStart(it) > now.abs);
   const nextStart = upcoming.length ? Math.min(...upcoming.map(absStart)) : null;
   // показываем блок только во время Гибуша (или за 3 часа до начала)
   if (!all.length || (!live.length && (nextStart === null || nextStart - now.abs > 180))) { el.innerHTML = ''; return; }
   const next = nextStart !== null && nextStart - now.abs <= 180 ? upcoming.filter(it => absStart(it) === nextStart) : [];
-  const row = (it, showEnd) => `<button class="nowitem" data-go="${it.day.num}-${it.start}">${it.hall ? hallLabel(it.hall) : '<span class="hl" style="color:var(--muted)">Для всех</span>'}<span class="t">${esc(it.title)}</span><span class="s">${it.speaker ? esc(it.speaker) + ' · ' : ''}<span class="tm">${showEnd ? 'до ' + fmt(it.end) : fmt(it.start) + '–' + fmt(it.end)}</span></span></button>`;
+  const row = (it, showEnd) => `<button class="nowitem" data-go="${it.day.num}-${it.start}">${it.hall ? hallLabel(it.hall) : it.own && !it.common ? `<span class="place">${esc(it.place || trackName())}</span>` : '<span class="hl" style="color:var(--muted)">Для всех</span>'}<span class="t">${esc(it.title)}</span><span class="s">${it.speaker ? esc(it.speaker) + ' · ' : ''}<span class="tm">${showEnd ? 'до ' + fmt(it.end) : fmt(it.start) + '–' + fmt(it.end)}</span></span></button>`;
   let html = '<div class="nowgrid">';
   if (live.length) html += `<div class="nowbox"><div class="nowhead"><span class="pulse"></span>Сейчас идёт</div>${live.map(it => row(it, true)).join('')}</div>`;
   if (next.length) {
@@ -579,8 +762,10 @@ $('#refresh').onclick = () => load();
 
 /* ---------- Старт ---------- */
 (function init() {
+  state.wantTrack = location.hash.slice(1) || store('gib-track') || 'adults';
+  window.addEventListener('hashchange', () => { const id = location.hash.slice(1) || 'adults'; if (state.tracks.some(t => t.id === id)) setTrack(id); });
   const cached = store('gib-cache');
-  apply(cached || { p: SNAPSHOT, n: '', i: '', t: SNAPSHOT_TIME }, false);
+  apply(cached || { p: SNAPSHOT, n: '', i: '', y: SNAPSHOT_TRACKS, t: SNAPSHOT_TIME }, false, !cached);
   load();
   setInterval(() => { if (document.visibilityState === 'visible') load(); }, CONFIG.refreshMs);
   setInterval(() => { renderStatus(); renderNow(); renderList(); }, 30000);
