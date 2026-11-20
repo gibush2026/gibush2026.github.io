@@ -274,28 +274,45 @@ function parseProgram(rows) {
   return days.filter(d => d.items.length);
 }
 
-function cleanTitle(s) { return /^["«“„]/.test(s) ? s.replace(/["«»“”„]/g, '').trim() : s; }
+function cleanTitle(s) {
+  const close = { '«': '»', '"': '"', '“': '”', '„': '“' }[s[0]];
+  if (!close) return s;
+  const i = s.indexOf(close, 1);
+  if (i === s.length - 1) return s.slice(1, -1).trim();
+  if (s[0] === '"' && (s.match(/"/g) || []).length % 2) return s.replace(/"/g, '').trim();
+  return s;
+}
 const cap = s => s ? s[0].toUpperCase() + s.slice(1) : s;
+const UP = /^[A-ZА-ЯЁĀ-Ž]/;
 const NAME_RE = /^((?:[A-ZА-ЯЁĀ-Ž][^\s]*)(?:\s+(?:[A-ZА-ЯЁĀ-Ž][^\s]*|-|и|\+|&))*)\s+[-–—]\s+(.+)$/;
+// строка похожа на имя(имена) людей: «Сергей Кравцов», «Маша Макарова и Эва Хеллер (зал Dzintari)»
+function isName(s) {
+  const t = s.replace(/\(.*?\)/g, '').replace(/,/g, ' ').trim();
+  if (!t || t.length > 80 || /[«»"“”:?!]/.test(t)) return false;
+  const w = t.split(/\s+/);
+  return w.length <= 9 && w.every(x => UP.test(x) || /^(и|&|\+|-|–)$/.test(x)) && w.filter(x => UP.test(x)).length >= 2;
+}
 
 function makeItem(day, start, end, hall, raw) {
   const lines = raw.split('\n').map(s => s.trim()).filter(Boolean);
-  let speaker = '', title = '', note = '';
-  if (lines.length > 1) {
-    speaker = lines[0];
-    const rest = lines.slice(1);
-    const notes = rest.filter(l => /^\(.*\)$/.test(l));
-    note = notes.map(l => l.slice(1, -1)).join(' ');
-    title = cap(rest.filter(l => !notes.includes(l)).map(cleanTitle).join(' '));
-  } else {
-    const m = lines[0].match(NAME_RE);
+  let speaker = '', title = '', note = '', sub = '';
+  const notes = lines.filter(l => /^\(.*\)$/.test(l));
+  note = notes.map(l => l.slice(1, -1)).join(' ');
+  const rest = lines.filter(l => !notes.includes(l));
+  if (rest.length > 1) {
+    if (isName(rest[0]) && !isName(rest[1])) { speaker = rest[0]; title = rest.slice(1).map(cleanTitle).join(' '); }
+    else if (isName(rest[rest.length - 1])) { speaker = rest[rest.length - 1]; title = rest.slice(0, -1).map(cleanTitle).join(' '); }
+    else { title = cleanTitle(rest[0]); sub = rest.slice(1).join(' '); }
+    title = cap(title);
+  } else if (rest.length === 1) {
+    const m = rest[0].match(NAME_RE);
     const caps = m ? (m[1].match(/(^|\s)[A-ZА-ЯЁĀ-Ž]/g) || []).length : 0;
     if (m && caps >= 2) { speaker = m[1].replace(/\s+-\s+/g, ', '); title = cap(cleanTitle(m[2])); }
-    else title = cleanTitle(lines[0]);
+    else title = cleanTitle(rest[0]);
   }
   if (!title) { title = speaker; speaker = ''; }
   title = title.replace(/\s+/g, ' ');
-  return { key: `${day.d}.${day.m}|${hall || '*'}|${start}`, day, start, end, hall, raw, speaker, title, note,
+  return { key: `${day.d}.${day.m}|${hall || '*'}|${start}`, day, start, end, hall, raw, speaker, title, note, sub,
     common: !hall, brk: !hall && BREAK_RE.test(raw) };
 }
 
@@ -468,7 +485,7 @@ function card(it, now) {
   const open = state.open.has(it.key);
   const cls = ['card', it.common ? 'common' : '', it.brk ? 'brk' : ''].join(' ');
   const top = (it.hall || changed) ? `<div class="card-top">${hallLabel(it.hall) || '<span></span>'}${changed ? '<span class="badge">Изменено</span>' : ''}</div>` : '';
-  const inner = `${top}${it.speaker ? `<div class="speaker">${esc(it.speaker)}</div>` : ''}<h3 class="title">${esc(it.title)}</h3>${it.note ? `<div class="note">${esc(it.note)}</div>` : ''}${desc ? (open ? `<div class="desc">${esc(desc)}</div>` : '<div class="more">Подробнее</div>') : ''}`;
+  const inner = `${top}${it.speaker ? `<div class="speaker">${esc(it.speaker)}</div>` : ''}<h3 class="title">${esc(it.title)}</h3>${it.sub ? `<div class="speaker">${esc(it.sub)}</div>` : ''}${it.note ? `<div class="note">${esc(it.note)}</div>` : ''}${desc ? (open ? `<div class="desc">${esc(desc)}</div>` : '<div class="more">Подробнее</div>') : ''}`;
   return desc ? `<button class="${cls}" data-key="${esc(it.key)}" aria-expanded="${open}">${inner}</button>` : `<article class="${cls}">${inner}</article>`;
 }
 function slotsOf(items) {
