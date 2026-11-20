@@ -81,6 +81,11 @@ button{font:inherit;color:inherit;cursor:pointer}
 .trk[aria-pressed="true"]{background:var(--blue);color:var(--white)}
 .place{font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
 .place::before{content:"";width:9px;height:9px;border-radius:50%;border:2px solid currentColor;box-sizing:border-box}
+.mark{font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#0A1424;border-radius:4px;padding:2px 6px;white-space:nowrap}
+.legend{display:grid;gap:6px;margin-top:12px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+.legend h4{margin:0;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.legend div{display:flex;gap:8px;align-items:baseline;font-size:13px;line-height:1.35}
+.legend .mark{flex:none}
 .tools{display:flex;gap:8px;align-items:center;min-width:0}
 .halls{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;flex:1;min-width:0;padding-block:1px}
 .halls::-webkit-scrollbar{display:none}
@@ -198,7 +203,8 @@ const CONFIG = {
   programGid: '595191200',      // gid листа с программой (число после #gid= в адресе листа)
   newsSheet: 'Объявления',      // необязательный лист: Когда | Текст | Важно
   infoSheet: 'Описания',        // необязательный лист: Ключ | Описание
-  tracksGid: '1637604800',      // gid листа с параллельными треками (YC Gibush program 2026)
+  tracksGid: '1637604800',
+  colorTracks: ['kids', 'noar'], // у этих треков показываем цветовые обозначения из таблицы      // gid листа с параллельными треками (YC Gibush program 2026)
   year: 2026,
   tz: 'Europe/Riga',
   refreshMs: 60000,
@@ -366,7 +372,10 @@ function stripTime(t, str) {
 function parseSpans(html) {
   try {
     const doc = new DOMParser().parseFromString(html, 'text/html');
-    const spans = {}, occ = {};
+    const spans = {}, occ = {}, bg = {}, cls = {};
+    doc.querySelectorAll('style').forEach(st => {
+      for (const m of st.textContent.matchAll(/\.(s\d+)\s*\{([^}]*)\}/g)) { const b = m[2].match(/background-color:\s*(#[0-9a-f]{6})/i); if (b) cls[m[1]] = b[1].toLowerCase(); }
+    });
     doc.querySelectorAll('table tr').forEach(tr => {
       const th = tr.querySelector('th[id]'); const m = th && th.id.match(/R(\d+)$/); if (!m) return;
       const r = +m[1]; let c = 0;
@@ -375,13 +384,48 @@ function parseSpans(html) {
         while (occ[r + ':' + c]) c++;
         const rs = +(td.getAttribute('rowspan') || 1), cs = +(td.getAttribute('colspan') || 1);
         spans[r + ':' + c] = rs;
+        const col = [...td.classList].map(x => cls[x]).find(Boolean);
+        if (col) bg[r + ':' + c] = col;
         for (let a = 0; a < rs; a++) for (let b = 0; b < cs; b++) if (a || b) occ[(r + a) + ':' + (c + b)] = 1;
         c += cs;
       });
     });
-    return { spans, occ };
+    return { spans, occ, bg };
   } catch (e) { return null; }
 }
+// цветовые группы стандартной палитры Google Таблиц: светлые и тёмные оттенки одного цвета — одна группа
+const PALETTE = {
+  red: ['ff0000', 'f4cccc', 'ea9999', 'e06666', 'cc0000', '990000', '660000'],
+  berry: ['980000', 'e6b8af', 'dd7e6b', 'cc4125', 'a61c00', '85200c', '5b0f00'],
+  orange: ['ff9900', 'fce5cd', 'f9cb9c', 'f6b26b', 'e69138', 'b45f06', '783f04'],
+  yellow: ['ffff00', 'fff2cc', 'ffe599', 'ffd966', 'f1c232', 'bf9000', '7f6000'],
+  green: ['00ff00', 'd9ead3', 'b6d7a8', '93c47d', '6aa84f', '38761d', '274e13'],
+  cyan: ['00ffff', 'd0e0e3', 'a2c4c9', '76a5af', '45818e', '134f5c', '0c343d'],
+  cornflower: ['4a86e8', 'c9daf8', 'a4c2f4', '6d9eeb', '3c78d8', '1155cc', '1c4587'],
+  blue: ['0000ff', 'cfe2f3', '9fc5e8', '6fa8dc', '3d85c6', '0b5394', '073763'],
+  purple: ['9900ff', 'd9d2e9', 'b4a7d6', '8e7cc3', '674ea7', '351c75', '20124d'],
+  magenta: ['ff00ff', 'ead1dc', 'd5a6bd', 'c27ba0', 'a64d79', '741b47', '4c1130']
+};
+function colorFamily(hex) {
+  if (!hex) return null; hex = hex.replace('#', '').toLowerCase();
+  if (/^(ffffff|fefefe|000000)$/.test(hex)) return null;
+  const rgb = x => [0, 2, 4].map(i => parseInt(x.slice(i, i + 2), 16));
+  const [r, g, b] = rgb(hex); let best = null, bd = 1e9;
+  for (const [fam, list] of Object.entries(PALETTE)) for (const x of list) {
+    const [R, G, B] = rgb(x); const d = (r - R) ** 2 + (g - G) ** 2 + (b - B) ** 2;
+    if (d < bd) { bd = d; best = fam; }
+  }
+  return bd < 2500 ? best : null;
+}
+function shortLegend(t) {
+  const s = t.toLowerCase();
+  if (/обязат/.test(s)) return 'Обязательно';
+  if (/опцион|по желанию/.test(s)) return 'По желанию';
+  if (/общая программа|с родител/.test(s)) return 'Общая программа';
+  if (/спец|трек/.test(s)) return 'Спец-опция';
+  return t.split(/\s+/).slice(0, 2).join(' ');
+}
+const sentence = t => { const s = t.replace(/\s+/g, ' ').trim().toLowerCase(); return s[0].toUpperCase() + s.slice(1); };
 function rowEndAt(rows, r, s) {
   const tl = ((rows[r] || [])[0] || '').match(TIME_RE); if (!tl) return null;
   let e = +tl[3] * 60 + +tl[4]; if (e <= s) e += 1440;
@@ -396,10 +440,15 @@ function parseTracks(rows, adultDays, sp) {
   const tracks = new Map();
   let groups = null, sub = null, subRow = -1, dayIdx = -1;
   const pops = [];
+  const legend = new Map(); // группа цвета → { label, text, hex }
   rows.forEach((r, i) => {
     const cells = r.map(c => (c || '').replace(/\t+/g, ' ').trim());
     const a = cells[0] || '';
     if (WEEKDAY_RE.test(a) && !TIME_RE.test(a)) { dayIdx++; return; }
+    if (dayIdx < 0 && sp && cells.filter(x => /посещ|программ|опци/i.test(x)).length >= 3) {
+      cells.forEach((x, j) => { const hex = sp.bg[i + ':' + j]; const fam = colorFamily(hex); if (x && fam && !legend.has(fam)) legend.set(fam, { label: shortLegend(x), text: sentence(x), hex }); });
+      return;
+    }
     const hdr = cells.map((c, j) => ({ c, j })).filter(x => x.j > 0 && x.c && x.c.length < 40 && !timeCols.has(x.j) && TRACK_NAMES.some(t => t[0].test(x.c)));
     if (new Set(hdr.map(x => TRACK_NAMES.find(t => t[0].test(x.c))[1])).size >= 3) {
       groups = hdr.map((x, k) => {
@@ -418,7 +467,7 @@ function parseTracks(rows, adultDays, sp) {
     if (popRow) pops.push({ day, s: rowS, e: rowE });
     groups.forEach(g => {
       if (g.id === 'adults') return;
-      if (!tracks.has(g.id)) tracks.set(g.id, { id: g.id, name: g.name, pending: [], refs: new Set(), join: [], hasHalls: false });
+      if (!tracks.has(g.id)) tracks.set(g.id, { id: g.id, name: g.name, pending: [], refs: new Set(), join: [], hasHalls: false, refColor: new Map() });
       const t = tracks.get(g.id);
       for (let c = g.start; c <= g.end; c++) {
         const subName = sub ? (sub[c] || '').trim() : '';
@@ -428,6 +477,7 @@ function parseTracks(rows, adultDays, sp) {
         if (!raw || timeCols.has(c) || HIDE_RE.test(raw)) continue;
         if (popRow && (hallCol || POP_TBD_RE.test(raw))) continue; // залы этой строки заняты поп-апами
         let text = raw;
+        const fam = sp ? colorFamily(sp.bg[i + ':' + c]) : null;
         const ex = explicitTime(text);
         const s = ex ? ex.s : rowS;
         if (s === null) continue;
@@ -435,8 +485,8 @@ function parseTracks(rows, adultDays, sp) {
         // взрослая сессия, на которую идёт трек
         let best = null, bs = 0;
         day.items.forEach(it => { if (it.start <= s && s < it.end) { const v = sim(text, it.raw); if (v > bs) { bs = v; best = it; } } });
-        if (best && bs >= 0.5) { t.refs.add(best); continue; }
-        if (JOIN_RE.test(text)) { t.join.push({ day, s, e: ex ? ex.e : (rowE || s + 90) }); continue; }
+        if (best && bs >= 0.5) { t.refs.add(best); if (fam && !t.refColor.has(best)) t.refColor.set(best, fam); continue; }
+        if (JOIN_RE.test(text)) { t.join.push({ day, s, e: ex ? ex.e : (rowE || s + 90), fam }); continue; }
         let e = ex ? ex.e : null, cap = null;
         if (e === null && sp && !ex) {
           const rs = sp.spans[i + ':' + c] || 1;
@@ -458,7 +508,7 @@ function parseTracks(rows, adultDays, sp) {
         const pm = text.match(/\(([A-ZĀ-Ž][A-ZĀ-Ž&\s]{3,})\)/);
         if (pm && !/^(ENG|RUS|LAT)$/.test(pm[1].trim())) { place = titleCase(pm[1].trim()); text = text.replace(pm[0], '').trim(); }
         else if (subName && !hallCol) place = '#' + titleCase(subName);
-        t.pending.push({ day, s, e, rowE, text, col: c, place, cap });
+        t.pending.push({ day, s, e, rowE, text, col: c, place, cap, fam });
       }
     });
   });
@@ -497,6 +547,7 @@ function parseTracks(rows, adultDays, sp) {
       }
       const it = makeItem(p.day, p.s, e, null, p.text);
       Object.assign(it, { common: false, brk: false, own: true, place: p.places.join(', '), key: `${p.day.d}.${p.day.m}|${t.id}|${p.s}|${k}` });
+      if (p.fam) t.refColor.set(it, p.fam);
       return it;
     });
     if (!t.own.length) continue;
@@ -508,6 +559,7 @@ function parseTracks(rows, adultDays, sp) {
       t.join.filter(j => j.day === d).forEach(j => {
         const b = makeItem(d, j.s, j.e, null, 'Вместе с родителями во взрослой программе');
         Object.assign(b, { own: true, key: `${d.d}.${d.m}|${t.id}|join|${j.s}` }); own.push(b);
+        if (j.fam) t.refColor.set(b, j.fam);
         d.items.forEach(it => { if (it.hall && it.start < j.e && it.end > j.s) set.add(it); });
       });
       if (t.hasHalls) {
@@ -522,13 +574,27 @@ function parseTracks(rows, adultDays, sp) {
       list.sort((x, y) => x.start - y.start || ord(x) - ord(y));
       t.byDay.set(d.num, list);
     });
-    out.push({ id: t.id, name: t.name, own: t.own, byDay: t.byDay });
+    const colored = CONFIG.colorTracks.includes(t.id) && legend.size;
+    out.push({ id: t.id, name: t.name, own: t.own, byDay: t.byDay, colors: colored ? t.refColor : null, legend: colored ? legend : null });
   }
   return out.length > 1 ? out : [];
 }
 function itemsFor(day) {
   const t = state.tracks.find(x => x.id === state.track);
   return t && t.byDay ? (t.byDay.get(day.num) || []) : day.items;
+}
+const curTrack = () => state.tracks.find(x => x.id === state.track);
+function markFor(it) {
+  const t = curTrack(); if (!t || !t.colors) return '';
+  const fam = t.colors.get(it); const L = fam && t.legend.get(fam);
+  return L ? `<span class="mark" style="background:${L.hex}">${esc(L.label)}</span>` : '';
+}
+function legendHTML() {
+  const t = curTrack(); if (!t || !t.colors) return '';
+  const used = new Set([...t.colors.values()]);
+  const rows = [...t.legend.entries()].filter(([f]) => used.has(f));
+  if (!rows.length) return '';
+  return `<div class="legend"><h4>Обозначения</h4>${rows.map(([f, L]) => `<div><span class="mark" style="background:${L.hex}">${esc(L.label)}</span><span>${esc(L.text)}</span></div>`).join('')}</div>`;
 }
 const trackName = () => (state.tracks.find(x => x.id === state.track) || { name: '' }).name;
 function renderTracks() {
@@ -726,7 +792,8 @@ function card(it, now) {
   const desc = descFor(it); const changed = state.changes[it.key];
   const open = state.open.has(it.key);
   const cls = ['card', it.common ? 'common' : '', it.brk ? 'brk' : ''].join(' ');
-  const top = (it.hall || it.place || changed) ? `<div class="card-top">${hallLabel(it.hall) || (it.place ? `<span class="place">${esc(it.place)}</span>` : '<span></span>')}${changed ? '<span class="badge">Изменено</span>' : ''}</div>` : '';
+  const mk = markFor(it);
+  const top = (it.hall || it.place || changed || mk) ? `<div class="card-top">${hallLabel(it.hall) || (it.place ? `<span class="place">${esc(it.place)}</span>` : '<span></span>')}<span style="display:flex;gap:4px">${mk}${changed ? '<span class="badge">Изменено</span>' : ''}</span></div>` : '';
   const inner = `${top}${it.speaker ? `<div class="speaker">${esc(it.speaker)}</div>` : ''}<h3 class="title">${esc(it.title)}</h3>${it.sub ? `<div class="speaker">${esc(it.sub)}</div>` : ''}${it.note ? `<div class="note">${esc(it.note)}</div>` : ''}${desc ? (open ? `<div class="desc">${esc(desc)}</div>` : '<div class="more">Подробнее</div>') : ''}`;
   return desc ? `<button class="${cls}" data-key="${esc(it.key)}" aria-expanded="${open}">${inner}</button>` : `<article class="${cls}">${inner}</article>`;
 }
@@ -763,7 +830,7 @@ function renderList() {
     html += `<button class="pastbtn" id="pastbtn">Показать прошедшее (${pastSlots.length})</button>`;
     html += slots.filter(s => !pastSlots.includes(s)).map(s => slotHTML(s, now)).join('');
   } else html += slots.map(s => slotHTML(s, now)).join('');
-  el.innerHTML = html || '<div class="empty">В этом зале в этот день ничего нет</div>';
+  el.innerHTML = html ? legendHTML() + html : '<div class="empty">В этом зале в этот день ничего нет</div>';
   const pb = $('#pastbtn'); if (pb) pb.onclick = () => { state.showPast = true; renderList(); };
   bindCards();
 }
@@ -781,7 +848,7 @@ function renderNow() {
   // показываем блок только во время Гибуша (или за 3 часа до начала)
   if (!all.length || (!live.length && (nextStart === null || nextStart - now.abs > 180))) { el.innerHTML = ''; return; }
   const next = nextStart !== null && nextStart - now.abs <= 180 ? upcoming.filter(it => absStart(it) === nextStart) : [];
-  const row = (it, showEnd) => `<button class="nowitem" data-go="${it.day.num}-${it.start}">${it.hall ? hallLabel(it.hall) : it.own && !it.common ? `<span class="place">${esc(it.place || trackName())}</span>` : '<span class="hl" style="color:var(--muted)">Для всех</span>'}<span class="t">${esc(it.title)}</span><span class="s">${it.speaker ? esc(it.speaker) + ' · ' : ''}<span class="tm">${showEnd ? 'до ' + fmt(it.end) : fmt(it.start) + '–' + fmt(it.end)}</span></span></button>`;
+  const row = (it, showEnd) => `<button class="nowitem" data-go="${it.day.num}-${it.start}">${it.hall ? hallLabel(it.hall) : it.own && !it.common ? `<span class="place">${esc(it.place || trackName())}</span>` : '<span class="hl" style="color:var(--muted)">Для всех</span>'}<span class="t">${esc(it.title)}</span><span class="s">${markFor(it) ? markFor(it) + ' ' : ''}${it.speaker ? esc(it.speaker) + ' · ' : ''}<span class="tm">${showEnd ? 'до ' + fmt(it.end) : fmt(it.start) + '–' + fmt(it.end)}</span></span></button>`;
   let html = '<div class="nowgrid">';
   if (live.length) html += `<div class="nowbox"><div class="nowhead"><span class="pulse"></span>Сейчас идёт</div>${live.map(it => row(it, true)).join('')}</div>`;
   if (next.length) {
