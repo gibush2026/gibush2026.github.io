@@ -126,9 +126,10 @@ button{font:inherit;color:inherit;cursor:pointer}
 .slot-time .live{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--white);background:var(--red);border-radius:4px;padding:2px 4px;justify-self:start;margin-top:4px}
 .slot.past{opacity:.5}
 .items{display:grid;gap:8px;min-width:0}
-.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:11px 13px 12px;display:grid;gap:3px;min-width:0;text-align:left;width:100%}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:11px 13px 12px;display:grid;grid-template-columns:minmax(0,1fr);gap:3px;min-width:0;text-align:left;width:100%}
 button.card{cursor:pointer}
-.card-top{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:16px}
+.card-top{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:4px 8px;min-height:16px;min-width:0}
+.card-top .tags{display:flex;flex-wrap:wrap;gap:4px;min-width:0}
 .hl{font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
 .speaker{font-size:13px;font-weight:500;color:var(--muted);overflow-wrap:anywhere}
 .title{font-size:16px;line-height:1.3;font-weight:700;margin:0;overflow-wrap:anywhere;text-wrap:pretty}
@@ -793,7 +794,7 @@ function card(it, now) {
   const open = state.open.has(it.key);
   const cls = ['card', it.common ? 'common' : '', it.brk ? 'brk' : ''].join(' ');
   const mk = markFor(it);
-  const top = (it.hall || it.place || changed || mk) ? `<div class="card-top">${hallLabel(it.hall) || (it.place ? `<span class="place">${esc(it.place)}</span>` : '<span></span>')}<span style="display:flex;gap:4px">${mk}${changed ? '<span class="badge">Изменено</span>' : ''}</span></div>` : '';
+  const top = (it.hall || it.place || changed || mk) ? `<div class="card-top">${hallLabel(it.hall) || (it.place ? `<span class="place">${esc(it.place)}</span>` : '<span></span>')}<span class="tags">${mk}${changed ? '<span class="badge">Изменено</span>' : ''}</span></div>` : '';
   const inner = `${top}${it.speaker ? `<div class="speaker">${esc(it.speaker)}</div>` : ''}<h3 class="title">${esc(it.title)}</h3>${it.sub ? `<div class="speaker">${esc(it.sub)}</div>` : ''}${it.note ? `<div class="note">${esc(it.note)}</div>` : ''}${desc ? (open ? `<div class="desc">${esc(desc)}</div>` : '<div class="more">Подробнее</div>') : ''}`;
   return desc ? `<button class="${cls}" data-key="${esc(it.key)}" aria-expanded="${open}">${inner}</button>` : `<article class="${cls}">${inner}</article>`;
 }
