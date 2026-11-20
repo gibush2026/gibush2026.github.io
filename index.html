@@ -334,6 +334,9 @@ const TRACK_NAMES = [
 // рабочие пометки: такие ячейки не показываем, пока организаторы их не уберут
 const HIDE_RE = /жд[её]м|хотим|\btbc\b|не против|свяжется|тут ничего|поймем|поймём|согласов|\d{1,2}[:.]\d{2}\s*\//i;
 const JOIN_RE = /участвуем\s+во?\s+взросл/i;
+// строка «POP UP — TBD»: весь слот показываем одной общей карточкой
+const POP_TBD_RE = /pop\s*-?\s*up\s*[-–—]\s*[tт][bв][dд]/i;
+const POP_TITLE = 'Pop-up сессии от участников Gibush';
 const WEEKDAY_RE = /^(пятн|субб|шаб|воскр|понед|вторн|сред|четв)/i;
 const titleCase = s => s.toLowerCase().replace(/(^|\s)(\S)/g, (m, a, b) => a + b.toUpperCase()).replace(/(^|\s)(i{1,3}|iv|v)(?=\s|$)/gi, (m, a, b) => a + b.toUpperCase());
 const stems = s => new Set((s.toLowerCase().match(/[a-zа-яёā-ž]{4,}/g) || []).map(w => w.slice(0, 5)));
@@ -392,6 +395,7 @@ function parseTracks(rows, adultDays, sp) {
   for (let c = 1; c < colCount; c++) { let k = 0; rows.forEach(r => { if (/^\s*\d{1,2}[.:]\d{2}\s*-/.test(r[c] || '')) k++; }); if (k >= 3) timeCols.add(c); }
   const tracks = new Map();
   let groups = null, sub = null, subRow = -1, dayIdx = -1;
+  const pops = [];
   rows.forEach((r, i) => {
     const cells = r.map(c => (c || '').replace(/\t+/g, ' ').trim());
     const a = cells[0] || '';
@@ -410,6 +414,8 @@ function parseTracks(rows, adultDays, sp) {
     const tm = a.match(TIME_RE);
     let rowS = null, rowE = null;
     if (tm) { rowS = +tm[1] * 60 + +tm[2]; rowE = +tm[3] * 60 + +tm[4]; if (rowE <= rowS) rowE = rowE + 1440 - rowS <= 360 ? rowE + 1440 : null; }
+    const popRow = rowS !== null && cells.some(x => POP_TBD_RE.test(x));
+    if (popRow) pops.push({ day, s: rowS, e: rowE });
     groups.forEach(g => {
       if (g.id === 'adults') return;
       if (!tracks.has(g.id)) tracks.set(g.id, { id: g.id, name: g.name, pending: [], refs: new Set(), join: [], hasHalls: false });
@@ -420,6 +426,7 @@ function parseTracks(rows, adultDays, sp) {
         if (hallCol) t.hasHalls = true;
         const raw = cells[c];
         if (!raw || timeCols.has(c) || HIDE_RE.test(raw)) continue;
+        if (popRow && (hallCol || POP_TBD_RE.test(raw))) continue; // залы этой строки заняты поп-апами
         let text = raw;
         const ex = explicitTime(text);
         const s = ex ? ex.s : rowS;
@@ -455,8 +462,19 @@ function parseTracks(rows, adultDays, sp) {
       }
     });
   });
+  // заменяем слот поп-апов во взрослой программе одной общей карточкой
+  pops.forEach(({ day, s, e }) => {
+    const slot = day.items.filter(it => it.start === s && it.hall);
+    const end = slot.length ? Math.max(...slot.map(it => it.end)) : (e || s + 20);
+    day.items = day.items.filter(it => !(it.start === s && it.hall));
+    if (!day.items.some(it => it.start === s && it.raw === POP_TITLE)) {
+      const it = makeItem(day, s, end, null, POP_TITLE); it.pop = true; day.items.push(it);
+      day.items.sort((x, y) => x.start - y.start || (x.hall ? 1 : 0) - (y.hall ? 1 : 0));
+    }
+  });
   const out = [{ id: 'adults', name: 'Взрослые', own: [] }];
   for (const t of tracks.values()) {
+    pops.forEach(({ day, s }) => { t.refs.forEach(it => { if (it.day === day && it.start === s) t.refs.delete(it); }); });
     // объединяем одинаковые ячейки (одна сессия в двух комнатах)
     const merged = [];
     t.pending.forEach(p => {
@@ -484,7 +502,7 @@ function parseTracks(rows, adultDays, sp) {
     if (!t.own.length) continue;
     t.byDay = new Map();
     adultDays.forEach(d => {
-      const set = new Set(d.items.filter(it => it.common));
+      const set = new Set(d.items.filter(it => it.common && (!it.pop || t.hasHalls)));
       t.refs.forEach(it => { if (it.day === d) set.add(it); });
       const own = t.own.filter(it => it.day === d);
       t.join.filter(j => j.day === d).forEach(j => {
