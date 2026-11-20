@@ -332,7 +332,7 @@ const TRACK_NAMES = [
   [/school/i, 'som', 'Школа мадрихов'], [/student/i, 'students', 'Студенты']
 ];
 // рабочие пометки: такие ячейки не показываем, пока организаторы их не уберут
-const HIDE_RE = /жд[её]м|хотим|\btbc\b|не против|свяжется|тут ничего|поймем|поймём|согласов|\d{1,2}[:.]\d{2}\s*\//i;
+const HIDE_RE = /жд[её]м|хотим|(?:^|[^a-zа-яё])[tт][bв][cdс](?:[^a-zа-яё]|$)|не против|свяжется|тут ничего|поймем|поймём|согласов|\d{1,2}[:.]\d{2}\s*\//i;
 const JOIN_RE = /участвуем\s+во?\s+взросл/i;
 const WEEKDAY_RE = /^(пятн|субб|шаб|воскр|понед|вторн|сред|четв)/i;
 const titleCase = s => s.toLowerCase().replace(/(^|\s)(\S)/g, (m, a, b) => a + b.toUpperCase()).replace(/(^|\s)(i{1,3}|iv|v)(?=\s|$)/gi, (m, a, b) => a + b.toUpperCase());
@@ -359,7 +359,32 @@ function stripTime(t, str) {
   else { const c = before.match(/(?:^|\s)[cс]\s*$/); if (c) a -= c[0].length; }
   return (t.slice(0, a) + t.slice(b)).replace(/[ \t]{2,}/g, ' ').trim();
 }
-function parseTracks(rows, adultDays) {
+// объединённые ячейки из HTML-вида таблицы: по ним видно, сколько строк (времени) занимает сессия
+function parseSpans(html) {
+  try {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const spans = {}, occ = {};
+    doc.querySelectorAll('table tr').forEach(tr => {
+      const th = tr.querySelector('th[id]'); const m = th && th.id.match(/R(\d+)$/); if (!m) return;
+      const r = +m[1]; let c = 0;
+      tr.querySelectorAll('td').forEach(td => {
+        if (td.classList.contains('freezebar-cell')) return;
+        while (occ[r + ':' + c]) c++;
+        const rs = +(td.getAttribute('rowspan') || 1), cs = +(td.getAttribute('colspan') || 1);
+        spans[r + ':' + c] = rs;
+        for (let a = 0; a < rs; a++) for (let b = 0; b < cs; b++) if (a || b) occ[(r + a) + ':' + (c + b)] = 1;
+        c += cs;
+      });
+    });
+    return { spans, occ };
+  } catch (e) { return null; }
+}
+function rowEndAt(rows, r, s) {
+  const tl = ((rows[r] || [])[0] || '').match(TIME_RE); if (!tl) return null;
+  let e = +tl[3] * 60 + +tl[4]; if (e <= s) e += 1440;
+  return e > s && e - s <= 360 ? e : null;
+}
+function parseTracks(rows, adultDays, sp) {
   if (!rows.length || !adultDays.length) return [];
   const adultHalls = new Set(state.halls.map(h => h.name.toLowerCase()));
   const colCount = Math.max(...rows.map(r => r.length));
@@ -405,14 +430,28 @@ function parseTracks(rows, adultDays) {
         day.items.forEach(it => { if (it.start <= s && s < it.end) { const v = sim(text, it.raw); if (v > bs) { bs = v; best = it; } } });
         if (best && bs >= 0.5) { t.refs.add(best); continue; }
         if (JOIN_RE.test(text)) { t.join.push({ day, s, e: ex ? ex.e : (rowE || s + 90) }); continue; }
-        let e = ex ? ex.e : null;
+        let e = ex ? ex.e : null, cap = null;
+        if (e === null && sp && !ex) {
+          const rs = sp.spans[i + ':' + c] || 1;
+          // следующая занятая строка в этой колонке
+          let nf = null;
+          for (let j = i + 1; j < rows.length; j++) {
+            const aj = (rows[j][0] || '').trim();
+            if (WEEKDAY_RE.test(aj)) break;
+            if (j > i + rs - 1 && ((rows[j][c] || '').trim() || sp.occ[j + ':' + c])) { nf = j; break; }
+          }
+          if (rs > 1) e = rowEndAt(rows, i + rs - 1, s);
+          else if (nf === i + 1) e = rowE;
+          if (nf !== null) { const tn = ((rows[nf][0] || '').match(TIME_RE)); if (tn) cap = +tn[1] * 60 + +tn[2]; }
+        }
         if (e === null && hallCol) { const slot = day.items.find(it => it.start === s); if (slot) e = slot.end; }
         if (e === null && rowE !== null && rowE - s >= 30) e = rowE;
+        if (e !== null && cap !== null && cap > s && cap < e) e = cap;
         let place = '';
         const pm = text.match(/\(([A-ZĀ-Ž][A-ZĀ-Ž&\s]{3,})\)/);
         if (pm && !/^(ENG|RUS|LAT)$/.test(pm[1].trim())) { place = titleCase(pm[1].trim()); text = text.replace(pm[0], '').trim(); }
         else if (subName && !hallCol) place = '#' + titleCase(subName);
-        t.pending.push({ day, s, e, rowE, text, col: c, place });
+        t.pending.push({ day, s, e, rowE, text, col: c, place, cap });
       }
     });
   });
@@ -436,6 +475,7 @@ function parseTracks(rows, adultDays) {
           ...[...t.refs].filter(it => it.day === p.day && it.start > p.s).map(it => it.start),
           ...p.day.items.filter(it => it.common && it.start > p.s).map(it => it.start)];
         e = nexts.length ? Math.min(...nexts) : (p.rowE || p.s + 60);
+        if (p.cap !== null && p.cap > p.s && p.cap < e) e = p.cap;
       }
       const it = makeItem(p.day, p.s, e, null, p.text);
       Object.assign(it, { common: false, brk: false, own: true, place: p.places.join(', '), key: `${p.day.d}.${p.day.m}|${t.id}|${p.s}|${k}` });
@@ -535,6 +575,7 @@ const BASE = `https://docs.google.com/spreadsheets/d/${CONFIG.sheetId}`;
 const URLS = {
   program: () => `${BASE}/export?format=csv&gid=${CONFIG.programGid}&_=${Date.now()}`,
   tracks: () => `${BASE}/export?format=csv&gid=${CONFIG.tracksGid}&_=${Date.now()}`,
+  tracksHtml: () => `${BASE}/htmlview/sheet?headers=false&gid=${CONFIG.tracksGid}&_=${Date.now()}`,
   news: () => `${BASE}/gviz/tq?tqx=out:csv&headers=1&sheet=${encodeURIComponent(CONFIG.newsSheet)}&_=${Date.now()}`,
   info: () => `${BASE}/gviz/tq?tqx=out:csv&headers=1&sheet=${encodeURIComponent(CONFIG.infoSheet)}&_=${Date.now()}`
 };
@@ -547,10 +588,10 @@ let loading = false;
 async function load() {
   if (loading) return; loading = true;
   try {
-    const [p, n, i, y] = await Promise.allSettled([getText(URLS.program()), getText(URLS.news()), getText(URLS.info()), getText(URLS.tracks())]);
+    const [p, n, i, y, yh] = await Promise.allSettled([getText(URLS.program()), getText(URLS.news()), getText(URLS.info()), getText(URLS.tracks()), getText(URLS.tracksHtml())]);
     if (p.status !== 'fulfilled') throw p.reason;
     const prev = store('gib-cache');
-    const data = { p: p.value, n: n.status === 'fulfilled' ? n.value : (prev ? prev.n : ''), i: i.status === 'fulfilled' ? i.value : (prev ? prev.i : ''), y: y.status === 'fulfilled' ? y.value : (prev ? prev.y : ''), t: Date.now() };
+    const data = { p: p.value, n: n.status === 'fulfilled' ? n.value : (prev ? prev.n : ''), i: i.status === 'fulfilled' ? i.value : (prev ? prev.i : ''), y: y.status === 'fulfilled' ? y.value : (prev ? prev.y : ''), ys: yh.status === 'fulfilled' ? parseSpans(yh.value) : (prev ? prev.ys : null), t: Date.now() };
     if (!apply(data, false)) throw new Error('empty');
     store('gib-cache', data);
   } catch (e) {
@@ -562,7 +603,7 @@ function apply(data, offline, fallback) {
   if (!days.length) return false;
   state.days = days; state.news = parseNews(data.n); state.info = parseInfo(data.i);
   state.updated = data.t; state.offline = offline;
-  try { state.tracks = parseTracks(parseCSV(data.y || ''), days); } catch (e) { state.tracks = []; }
+  try { state.tracks = parseTracks(parseCSV(data.y || ''), days, data.ys || null); } catch (e) { state.tracks = []; }
   const want = state.wantTrack || state.track;
   state.track = state.tracks.some(t => t.id === want) ? want : 'adults';
   // встроенная копия — не повод показывать «изменения» новому посетителю
