@@ -205,7 +205,7 @@ const CONFIG = {
   newsSheet: 'Объявления',      // необязательный лист: Когда | Текст | Важно
   infoSheet: 'Описания',        // необязательный лист: Ключ | Описание
   tracksGid: '1637604800',
-  colorTracks: ['kids', 'noar'], // у этих треков показываем цветовые обозначения из таблицы      // gid листа с параллельными треками (YC Gibush program 2026)
+  colorTracks: ['kids', 'noar', 'mu', 'som'], // у этих треков показываем цветовые обозначения из таблицы      // gid листа с параллельными треками (YC Gibush program 2026)
   year: 2026,
   tz: 'Europe/Riga',
   refreshMs: 60000,
@@ -420,13 +420,17 @@ function colorFamily(hex) {
 }
 function shortLegend(t) {
   const s = t.toLowerCase();
+  if (/специальн\S* программ/.test(s)) return 'Программа трека';
   if (/обязат/.test(s)) return 'Обязательно';
   if (/опцион|по желанию/.test(s)) return 'По желанию';
   if (/общая программа|с родител/.test(s)) return 'Общая программа';
   if (/спец|трек/.test(s)) return 'Спец-опция';
   return t.split(/\s+/).slice(0, 2).join(' ');
 }
-const sentence = t => { const s = t.replace(/\s+/g, ' ').trim().toLowerCase(); return s[0].toUpperCase() + s.slice(1); };
+const sentence = t => {
+  const s = t.replace(/\s+/g, ' ').trim().replace(/[А-ЯЁ]+/g, w => w.toLowerCase()).replace(/\b([A-Z])([A-Z]{2,})\b/g, (m, a, b) => a + b.toLowerCase());
+  return s[0].toUpperCase() + s.slice(1);
+};
 function rowEndAt(rows, r, s) {
   const tl = ((rows[r] || [])[0] || '').match(TIME_RE); if (!tl) return null;
   let e = +tl[3] * 60 + +tl[4]; if (e <= s) e += 1440;
@@ -441,13 +445,13 @@ function parseTracks(rows, adultDays, sp) {
   const tracks = new Map();
   let groups = null, sub = null, subRow = -1, dayIdx = -1;
   const pops = [];
-  const legend = new Map(); // группа цвета → { label, text, hex }
+  const legendCells = []; // { c, fam, label, text, hex } — легенды над колонками треков
   rows.forEach((r, i) => {
     const cells = r.map(c => (c || '').replace(/\t+/g, ' ').trim());
     const a = cells[0] || '';
     if (WEEKDAY_RE.test(a) && !TIME_RE.test(a)) { dayIdx++; return; }
     if (dayIdx < 0 && sp && cells.filter(x => /посещ|программ|опци/i.test(x)).length >= 3) {
-      cells.forEach((x, j) => { const hex = sp.bg[i + ':' + j]; const fam = colorFamily(hex); if (x && fam && !legend.has(fam)) legend.set(fam, { label: shortLegend(x), text: sentence(x), hex }); });
+      cells.forEach((x, j) => { const hex = sp.bg[i + ':' + j]; const fam = colorFamily(hex); if (x && fam) legendCells.push({ c: j, fam, label: shortLegend(x), text: sentence(x), hex }); });
       return;
     }
     const hdr = cells.map((c, j) => ({ c, j })).filter(x => x.j > 0 && x.c && x.c.length < 40 && !timeCols.has(x.j) && TRACK_NAMES.some(t => t[0].test(x.c)));
@@ -468,7 +472,7 @@ function parseTracks(rows, adultDays, sp) {
     if (popRow) pops.push({ day, s: rowS, e: rowE });
     groups.forEach(g => {
       if (g.id === 'adults') return;
-      if (!tracks.has(g.id)) tracks.set(g.id, { id: g.id, name: g.name, pending: [], refs: new Set(), join: [], hasHalls: false, refColor: new Map() });
+      if (!tracks.has(g.id)) tracks.set(g.id, { id: g.id, name: g.name, start: g.start, end: g.end, pending: [], refs: new Set(), join: [], hasHalls: false, refColor: new Map() });
       const t = tracks.get(g.id);
       for (let c = g.start; c <= g.end; c++) {
         const subName = sub ? (sub[c] || '').trim() : '';
@@ -575,6 +579,16 @@ function parseTracks(rows, adultDays, sp) {
       list.sort((x, y) => x.start - y.start || ord(x) - ord(y));
       t.byDay.set(d.num, list);
     });
+    // легенда трека — ячейки над его колонками; если их нет — общие ячейки вне колонок треков
+    const legend = new Map();
+    let own = legendCells.filter(x => x.c >= t.start && x.c <= t.end);
+    if (!own.length) {
+      // у трека нет своей легенды (например, у подростков) — берём самую полную легенду листа
+      let bestSet = [];
+      [...tracks.values()].forEach(o => { const s = legendCells.filter(x => x.c >= o.start && x.c <= o.end); if (s.length > bestSet.length) bestSet = s; });
+      own = bestSet;
+    }
+    own.forEach(x => { if (!legend.has(x.fam)) legend.set(x.fam, x); });
     const colored = CONFIG.colorTracks.includes(t.id) && legend.size;
     out.push({ id: t.id, name: t.name, own: t.own, byDay: t.byDay, colors: colored ? t.refColor : null, legend: colored ? legend : null });
   }
