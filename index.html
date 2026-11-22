@@ -470,6 +470,24 @@ function parseTracks(rows, adultDays, sp) {
     if (tm) { rowS = +tm[1] * 60 + +tm[2]; rowE = +tm[3] * 60 + +tm[4]; if (rowE <= rowS) rowE = rowE + 1440 - rowS <= 360 ? rowE + 1440 : null; }
     const popRow = rowS !== null && cells.some(x => POP_TBD_RE.test(x));
     if (popRow) pops.push({ day, s: rowS, e: rowE });
+    // общая строка через весь лист (слева от всех треков): «Заезд», «Выселение из номеров» — событие для всех
+    if (rowS !== null) {
+      const firstCol = Math.min(...groups.map(g => g.start));
+      for (let c = 1; c < firstCol; c++) {
+        const raw = cells[c];
+        if (!raw || timeCols.has(c) || HIDE_RE.test(raw)) continue;
+        const kind = s => ((s.match(BREAK_RE) || [])[1] || '').toLowerCase();
+        const dup = day.items.some(it => it.common && Math.abs(it.start - rowS) <= 60 &&
+          (sim(raw, it.raw) >= 0.5 || (kind(raw) && kind(raw) === kind(it.raw))));
+        if (dup) continue;
+        const rs = sp ? (sp.spans[i + ':' + c] || 1) : 1;
+        const e = (rs > 1 ? rowEndAt(rows, i + rs - 1, rowS) : null) || rowE || rowS + 30;
+        const it = makeItem(day, rowS, e, null, raw);
+        Object.assign(it, { everyone: true, key: `${day.d}.${day.m}|*|${rowS}|y${c}` });
+        day.items.push(it);
+        day.items.sort((x, y) => x.start - y.start || (x.hall ? 1 : 0) - (y.hall ? 1 : 0));
+      }
+    }
     groups.forEach(g => {
       if (g.id === 'adults') return;
       if (!tracks.has(g.id)) tracks.set(g.id, { id: g.id, name: g.name, start: g.start, end: g.end, pending: [], refs: new Set(), join: [], hasHalls: false, refColor: new Map() });
@@ -568,7 +586,7 @@ function parseTracks(rows, adultDays, sp) {
         d.items.forEach(it => { if (it.hall && it.start < j.e && it.end > j.s) set.add(it); });
       });
       // общее событие (кроме еды) не показываем, если у трека в это время своя программа и он на него не идёт
-      set.forEach(it => { if (it.common && !it.brk && !t.refs.has(it) && own.some(o => o.start < it.end && o.end > it.start)) set.delete(it); });
+      set.forEach(it => { if (it.common && !it.brk && !it.everyone && !t.refs.has(it) && own.some(o => o.start < it.end && o.end > it.start)) set.delete(it); });
       if (t.hasHalls) {
         // в свободные от своих сессий слоты — взрослые лекции на выбор
         slotsOf(d.items.filter(it => it.hall)).forEach(sl => {
