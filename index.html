@@ -567,6 +567,8 @@ function parseTracks(rows, adultDays, sp) {
         if (j.fam) t.refColor.set(b, j.fam);
         d.items.forEach(it => { if (it.hall && it.start < j.e && it.end > j.s) set.add(it); });
       });
+      // общее событие (кроме еды) не показываем, если у трека в это время своя программа и он на него не идёт
+      set.forEach(it => { if (it.common && !it.brk && !t.refs.has(it) && own.some(o => o.start < it.end && o.end > it.start)) set.delete(it); });
       if (t.hasHalls) {
         // в свободные от своих сессий слоты — взрослые лекции на выбор
         slotsOf(d.items.filter(it => it.hall)).forEach(sl => {
