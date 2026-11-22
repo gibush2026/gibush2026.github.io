@@ -477,11 +477,16 @@ function parseTracks(rows, adultDays, sp) {
         const raw = cells[c];
         if (!raw || timeCols.has(c) || HIDE_RE.test(raw)) continue;
         const kind = s => ((s.match(BREAK_RE) || [])[1] || '').toLowerCase();
-        const dup = day.items.some(it => it.common && Math.abs(it.start - rowS) <= 60 &&
-          (sim(raw, it.raw) >= 0.5 || (kind(raw) && kind(raw) === kind(it.raw))));
-        if (dup) continue;
         const rs = sp ? (sp.spans[i + ':' + c] || 1) : 1;
         const e = (rs > 1 ? rowEndAt(rows, i + rs - 1, rowS) : null) || rowE || rowS + 30;
+        const near = day.items.filter(it => it.common && !it.everyone && Math.abs(it.start - rowS) <= 60);
+        const meal = kind(raw) && near.find(it => kind(it.raw) === kind(raw));
+        if (meal) {
+          // время еды берём из листа треков, название — из взрослого листа
+          if (meal.start !== rowS || meal.end !== e) { meal.start = rowS; meal.end = e; meal.key = `${day.d}.${day.m}|*|${rowS}`; day.items.sort((x, y) => x.start - y.start || (x.hall ? 1 : 0) - (y.hall ? 1 : 0)); }
+          continue;
+        }
+        if (near.some(it => sim(raw, it.raw) >= 0.5)) continue;
         const it = makeItem(day, rowS, e, null, raw);
         Object.assign(it, { everyone: true, key: `${day.d}.${day.m}|*|${rowS}|y${c}` });
         day.items.push(it);
