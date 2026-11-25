@@ -141,6 +141,8 @@ button.card{cursor:pointer}
 .card.common .title{font-weight:800}
 .card.brk{background:transparent;border-style:dashed}
 .card.brk .title{font-weight:500;font-size:15px;color:var(--muted)}
+.cmt{font-size:13px;font-style:italic;color:var(--muted);display:flex;gap:6px;align-items:baseline}
+.cmt::before{content:'\2721\FE0E';font-style:normal;opacity:.7}
 .empty{padding:28px 4px;color:var(--muted);text-align:center}
 .dayhead{font-size:13px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:18px 0 4px}
 
@@ -248,6 +250,7 @@ function parseCSV(t) {
 const TIME_RE = /^\s*(\d{1,2})[.:](\d{2})\s*[-–—]\s*(\d{1,2})[.:](\d{2})/;
 const DAY_RE = /(пятн|субб|шаб|воскр|понед|вторн|сред|четв)[^\d]{0,12}(\d{1,2})[.\/](\d{1,2})/i;
 const BREAK_RE = /^(завтрак|обед|ужин|coffee|кофе)/i;
+const COMMENT_RE = /^выход\s+шабб?ат/i;
 const normHall = s => s.replace(/\s+/g, ' ').trim();
 
 function parseProgram(rows) {
@@ -312,9 +315,11 @@ function isName(s) {
 function makeItem(day, start, end, hall, raw) {
   const lines = raw.split('\n').map(s => s.trim()).filter(Boolean);
   let speaker = '', title = '', note = '', sub = '';
+  // строки-комментарии (например «Выход Шаббата в 17:01») показываем мелко под названием
+  const cmts = lines.filter(l => COMMENT_RE.test(l));
   const notes = lines.filter(l => /^\(.*\)$/.test(l));
   note = notes.map(l => l.slice(1, -1)).join(' ');
-  const rest = lines.filter(l => !notes.includes(l));
+  const rest = lines.filter(l => !notes.includes(l) && !cmts.includes(l));
   if (rest.length > 1) {
     if (isName(rest[0]) && !isName(rest[1])) { speaker = rest[0]; title = rest.slice(1).map(cleanTitle).join(' '); }
     else if (isName(rest[rest.length - 1])) { speaker = rest[rest.length - 1]; title = rest.slice(0, -1).map(cleanTitle).join(' '); }
@@ -328,7 +333,7 @@ function makeItem(day, start, end, hall, raw) {
   }
   if (!title) { title = speaker; speaker = ''; }
   title = title.replace(/\s+/g, ' ');
-  return { key: `${day.d}.${day.m}|${hall || '*'}|${start}`, day, start, end, hall, raw, speaker, title, note, sub,
+  return { key: `${day.d}.${day.m}|${hall || '*'}|${start}`, day, start, end, hall, raw, speaker, title, note, sub, cmt: cmts.join(' · '),
     common: !hall, brk: !hall && BREAK_RE.test(raw) };
 }
 
@@ -902,7 +907,7 @@ function card(it, now) {
   const cls = ['card', it.common ? 'common' : '', it.brk ? 'brk' : ''].join(' ');
   const mk = markFor(it);
   const top = (it.hall || it.place || changed || mk) ? `<div class="card-top">${hallLabel(it.hall) || (it.place ? `<span class="place">${esc(it.place)}</span>` : '<span></span>')}<span class="tags">${mk}${changed ? '<span class="badge">Изменено</span>' : ''}</span></div>` : '';
-  const inner = `${top}${it.speaker ? `<div class="speaker">${esc(it.speaker)}</div>` : ''}<h3 class="title">${esc(it.title)}</h3>${it.sub ? `<div class="speaker">${esc(it.sub)}</div>` : ''}${it.note ? `<div class="note">${esc(it.note)}</div>` : ''}${desc ? (open ? `<div class="desc">${esc(desc)}</div>` : '<div class="more">Подробнее</div>') : ''}`;
+  const inner = `${top}${it.speaker ? `<div class="speaker">${esc(it.speaker)}</div>` : ''}<h3 class="title">${esc(it.title)}</h3>${it.sub ? `<div class="speaker">${esc(it.sub)}</div>` : ''}${it.note ? `<div class="note">${esc(it.note)}</div>` : ''}${it.cmt ? `<div class="cmt">${esc(it.cmt)}</div>` : ''}${desc ? (open ? `<div class="desc">${esc(desc)}</div>` : '<div class="more">Подробнее</div>') : ''}`;
   return desc ? `<button class="${cls}" data-key="${esc(it.key)}" aria-expanded="${open}">${inner}</button>` : `<article class="${cls}">${inner}</article>`;
 }
 function slotsOf(items) {
