@@ -141,6 +141,9 @@ button.card{cursor:pointer}
 .card.common .title{font-weight:800}
 .card.brk{background:transparent;border-style:dashed}
 .card.brk .title{font-weight:500;font-size:15px;color:var(--muted)}
+.venue{font-size:12px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;background:var(--red);color:#fff;border-radius:6px;padding:4px 8px;white-space:normal;display:inline-flex;align-items:center;gap:6px}
+.venue::before{content:"";width:9px;height:9px;border-radius:50%;border:2px solid currentColor;box-sizing:border-box;flex:none}
+.card.away{border:2px solid var(--red)}
 .cmt{font-size:13px;font-style:italic;color:var(--muted);display:flex;gap:6px;align-items:baseline}
 .cmt::before{content:'\2721\FE0E';font-style:normal;opacity:.7}
 .empty{padding:28px 4px;color:var(--muted);text-align:center}
@@ -251,7 +254,18 @@ const TIME_RE = /^\s*(\d{1,2})[.:](\d{2})\s*[-–—]\s*(\d{1,2})[.:](\d{2})/;
 const DAY_RE = /(пятн|субб|шаб|воскр|понед|вторн|сред|четв)[^\d]{0,12}(\d{1,2})[.\/](\d{1,2})/i;
 const BREAK_RE = /^(завтрак|обед|ужин|coffee|кофе)/i;
 const COMMENT_RE = /^выход\s+шабб?ат/i;
-const normHall = s => s.replace(/\s+/g, ' ').trim();
+// «📍Место» в ячейке: место проведения. Возвращает место, время после тире и текст без метки
+function pinOf(raw) {
+  const m = raw.match(/📍[ \t]*([^\n]*)/); if (!m) return null;
+  let place = m[1], time = '', tail = '';
+  place = place.replace(/\s*\(([^)]*)\)\s*$/, x => { tail = ' ' + x.trim(); return ''; });
+  place = place.replace(/\s*[—–-]\s*(\d{1,2}[:.]\d{2}\s*[-–—]\s*\d{1,2}[:.]\d{2})\s*$/, (x, t) => { time = t.replace(/\s+/g, '').replace(/[-—]/, '–'); return ''; });
+  place = place.trim(); if (!place) return null;
+  if (place === place.toUpperCase()) place = titleCase(place);
+  const text = raw.replace(m[0], tail).split('\n').filter(l => !/^\s*зал\s*$/i.test(l)).join('\n');
+  return { place, time, text };
+}
+const normHall = s => s.replace(/📍/g, '').replace(/\s+/g, ' ').trim();
 
 function parseProgram(rows) {
   const days = []; const hallMap = new Map(); let halls = null, day = null, hallRow = -9;
@@ -313,7 +327,8 @@ function isName(s) {
 }
 
 function makeItem(day, start, end, hall, raw) {
-  const lines = raw.split('\n').map(s => s.trim()).filter(Boolean);
+  const pin = pinOf(raw);
+  const lines = (pin ? pin.text : raw).split('\n').map(s => s.trim()).filter(Boolean);
   let speaker = '', title = '', note = '', sub = '';
   // строки-комментарии (например «Выход Шаббата в 17:01») показываем мелко под названием
   const cmts = lines.filter(l => COMMENT_RE.test(l));
@@ -333,7 +348,7 @@ function makeItem(day, start, end, hall, raw) {
   }
   if (!title) { title = speaker; speaker = ''; }
   title = title.replace(/\s+/g, ' ');
-  return { key: `${day.d}.${day.m}|${hall || '*'}|${start}`, day, start, end, hall, raw, speaker, title, note, sub, cmt: cmts.join(' · '),
+  return { key: `${day.d}.${day.m}|${hall || '*'}|${start}`, day, start, end, hall, raw, speaker, title, note, sub, cmt: cmts.join(' · '), place: pin ? pin.place : '', pinTime: pin ? pin.time : '',
     common: !hall, brk: !hall && BREAK_RE.test(raw) };
 }
 
@@ -350,7 +365,7 @@ const JOIN_RE = /участвуем\s+во?\s+взросл/i;
 const POP_TBD_RE = /pop\s*-?\s*up\s*[-–—]\s*[tт][bв][dд]/i;
 const POP_TITLE = 'Pop-up сессии от участников Gibush';
 const WEEKDAY_RE = /^(пятн|субб|шаб|воскр|понед|вторн|сред|четв)/i;
-const titleCase = s => s.toLowerCase().replace(/(^|\s)(\S)/g, (m, a, b) => a + b.toUpperCase()).replace(/(^|\s)(i{1,3}|iv|v)(?=\s|$)/gi, (m, a, b) => a + b.toUpperCase());
+const titleCase = s => s.replace(/📍/g, '').trim().toLowerCase().replace(/(^|\s)(\S)/g, (m, a, b) => a + b.toUpperCase()).replace(/(^|\s)(i{1,3}|iv|v)(?=\s|$)/gi, (m, a, b) => a + b.toUpperCase());
 const stems = s => new Set((s.toLowerCase().match(/[a-zа-яёā-ž]{4,}/g) || []).map(w => w.slice(0, 5)));
 const normT = s => s.toLowerCase().replace(/[^a-zа-яёā-ž0-9]/g, '');
 function sim(a, b) {
@@ -604,8 +619,10 @@ function parseTracks(rows, adultDays, sp) {
         if (e === null && rowE !== null && rowE - s >= 30) e = rowE;
         if (e !== null && cap !== null && cap > s && cap < e) e = cap;
         let place = '';
-        const pm = text.match(/\(([A-ZĀ-Ž][A-ZĀ-Ž&\s]{3,})\)/);
-        if (pm && !/^(ENG|RUS|LAT)$/.test(pm[1].trim())) { place = titleCase(pm[1].trim()); text = text.replace(pm[0], '').trim(); }
+        const pp = pinOf(text);
+        const pm = pp ? null : text.match(/\(([A-ZĀ-Ž][A-ZĀ-Ž&\s]{3,})\)/);
+        if (pp) place = pp.place;
+        else if (pm && !/^(ENG|RUS|LAT)$/.test(pm[1].trim())) { place = titleCase(pm[1].trim()); text = text.replace(pm[0], '').trim(); }
         else if (subName && !hallCol) place = '#' + titleCase(subName);
         t.pending.push({ day, s, e, rowE, text, col: c, place, cap, fam });
       }
@@ -645,7 +662,7 @@ function parseTracks(rows, adultDays, sp) {
         if (p.cap !== null && p.cap > p.s && p.cap < e) e = p.cap;
       }
       const it = makeItem(p.day, p.s, e, null, p.text);
-      Object.assign(it, { common: false, brk: false, own: true, place: p.places.join(', '), key: `${p.day.d}.${p.day.m}|${t.id}|${p.s}|${k}` });
+      Object.assign(it, { common: false, brk: false, own: true, place: p.places.join(', ') || it.place, key: `${p.day.d}.${p.day.m}|${t.id}|${p.s}|${k}` });
       if (p.fam) t.refColor.set(it, p.fam);
       return it;
     });
@@ -839,6 +856,9 @@ function hallStyle(name) {
   const h = state.halls.find(x => x.name === name); const i = h ? h.idx % 3 : 0;
   return { sq: `var(--h${i})`, t: `var(--h${i}t)` };
 }
+// сессия числится в колонке зала, но проходит в другом месте: показываем место крупно
+const elsewhere = it => it.hall && it.place && normT(it.place) !== normT(it.hall);
+const venueLabel = it => `<span class="venue">${esc(it.place)}${it.pinTime ? ` · ${esc(it.pinTime)}` : ''}</span>`;
 function hallLabel(name) {
   if (!name) return '';
   const s = hallStyle(name);
@@ -904,9 +924,9 @@ function matches(it) {
 function card(it, now) {
   const desc = descFor(it); const changed = state.changes[it.key];
   const open = state.open.has(it.key);
-  const cls = ['card', it.common ? 'common' : '', it.brk ? 'brk' : ''].join(' ');
+  const cls = ['card', it.common ? 'common' : '', it.brk ? 'brk' : '', elsewhere(it) ? 'away' : ''].join(' ');
   const mk = markFor(it);
-  const top = (it.hall || it.place || changed || mk) ? `<div class="card-top">${hallLabel(it.hall) || (it.place ? `<span class="place">${esc(it.place)}</span>` : '<span></span>')}<span class="tags">${mk}${changed ? '<span class="badge">Изменено</span>' : ''}</span></div>` : '';
+  const top = (it.hall || it.place || changed || mk) ? `<div class="card-top">${elsewhere(it) ? venueLabel(it) : hallLabel(it.hall) || (it.place ? `<span class="place">${esc(it.place)}</span>` : '<span></span>')}<span class="tags">${mk}${changed ? '<span class="badge">Изменено</span>' : ''}</span></div>` : '';
   const inner = `${top}${it.speaker ? `<div class="speaker">${esc(it.speaker)}</div>` : ''}<h3 class="title">${esc(it.title)}</h3>${it.sub ? `<div class="speaker">${esc(it.sub)}</div>` : ''}${it.note ? `<div class="note">${esc(it.note)}</div>` : ''}${it.cmt ? `<div class="cmt">${esc(it.cmt)}</div>` : ''}${desc ? (open ? `<div class="desc">${esc(desc)}</div>` : '<div class="more">Подробнее</div>') : ''}`;
   return desc ? `<button class="${cls}" data-key="${esc(it.key)}" aria-expanded="${open}">${inner}</button>` : `<article class="${cls}">${inner}</article>`;
 }
@@ -961,7 +981,7 @@ function renderNow() {
   // показываем блок только во время Гибуша (или за 3 часа до начала)
   if (!all.length || (!live.length && (nextStart === null || nextStart - now.abs > 180))) { el.innerHTML = ''; return; }
   const next = nextStart !== null && nextStart - now.abs <= 180 ? upcoming.filter(it => absStart(it) === nextStart) : [];
-  const row = (it, showEnd) => `<button class="nowitem" data-go="${it.day.num}-${it.start}">${it.hall ? hallLabel(it.hall) : it.own && !it.common ? `<span class="place">${esc(it.place || trackName())}</span>` : '<span class="hl" style="color:var(--muted)">Для всех</span>'}<span class="t">${esc(it.title)}</span><span class="s">${markFor(it) ? markFor(it) + ' ' : ''}${it.speaker ? esc(it.speaker) + ' · ' : ''}<span class="tm">${showEnd ? 'до ' + fmt(it.end) : fmt(it.start) + '–' + fmt(it.end)}</span></span></button>`;
+  const row = (it, showEnd) => `<button class="nowitem" data-go="${it.day.num}-${it.start}">${elsewhere(it) ? venueLabel(it) : it.hall ? hallLabel(it.hall) : it.own && !it.common ? `<span class="place">${esc(it.place || trackName())}</span>` : '<span class="hl" style="color:var(--muted)">Для всех</span>'}<span class="t">${esc(it.title)}</span><span class="s">${markFor(it) ? markFor(it) + ' ' : ''}${it.speaker ? esc(it.speaker) + ' · ' : ''}<span class="tm">${showEnd ? 'до ' + fmt(it.end) : fmt(it.start) + '–' + fmt(it.end)}</span></span></button>`;
   let html = '<div class="nowgrid">';
   if (live.length) html += `<div class="nowbox"><div class="nowhead"><span class="pulse"></span>Сейчас идёт</div>${live.map(it => row(it, true)).join('')}</div>`;
   if (next.length) {
