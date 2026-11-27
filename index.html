@@ -911,7 +911,8 @@ function renderNews() {
 }
 // важные объявления (Важно = да) один раз показываем во всплывающем окне
 function showPopup() {
-  if (!$('#pop').hidden) return;
+  // окно открыто со старым объявлением (из сохранённой копии), а в таблице его уже нет — меняем
+  if (!$('#pop').hidden) { if (state.news.some(x => x.hot && x.text === $('#poptext').textContent)) return; $('#pop').hidden = true; }
   const done = new Set(store('gib-pop') || []);
   const n = state.news.find(x => x.hot && !done.has(x.text)); if (!n) return;
   $('#popwhen').textContent = n.when || ''; $('#poptext').textContent = n.text; $('#pop').hidden = false;
