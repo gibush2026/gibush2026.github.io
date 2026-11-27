@@ -263,6 +263,7 @@ const TIME_RE = /^\s*(\d{1,2})[.:](\d{2})\s*[-–—]\s*(\d{1,2})[.:](\d{2})/;
 const DAY_RE = /(пятн|субб|шаб|воскр|понед|вторн|сред|четв)[^\d]{0,12}(\d{1,2})[.\/](\d{1,2})/i;
 const BREAK_RE = /^(завтрак|обед|ужин|coffee|кофе)/i;
 const COMMENT_RE = /^выход\s+шабб?ат/i;
+const LEAD_RE = /^\s*(?:в|с|c)\s+(\d{1,2})[:.](\d{2})(?:\s*[-–—]\s*(\d{1,2})[:.](\d{2}))?\s*[-–—:]\s*/i;
 // «📍Место» в ячейке: место проведения. Возвращает место, время после тире и текст без метки
 function pinOf(raw) {
   const m = raw.match(/📍[ \t]*([^\n]*)/); if (!m) return null;
@@ -336,6 +337,12 @@ function isName(s) {
 }
 
 function makeItem(day, start, end, hall, raw) {
+  // «В 9:45 - Шахарит…» / «С 9:45-11:00 — …» в начале ячейки: время из текста важнее строки таблицы
+  const lead = raw.match(LEAD_RE);
+  if (lead) {
+    const ns = +lead[1] * 60 + +lead[2], dur = end - start;
+    end = lead[3] ? +lead[3] * 60 + +lead[4] : ns + dur; start = ns; raw = raw.slice(lead[0].length); hall = null; // время сдвинуто — зал строки уже не при чём
+  }
   const pin = pinOf(raw);
   // время после места («📍Dzintari Hall — 21:00-23:00») точнее объединённых ячеек
   if (pin && pin.time) { const t = explicitTime(pin.time.replace('–', '-')); if (t && t.s === start) end = t.e; }
@@ -604,7 +611,8 @@ function parseTracks(rows, adultDays, sp) {
         let text = raw;
         const fam = sp ? colorFamily(sp.bg[i + ':' + c]) : null;
         const ex = explicitTime(text);
-        const s = ex ? ex.s : rowS;
+        const ld = ex ? null : text.match(LEAD_RE); // «В 9:45 - …»: время из текста
+        const s = ex ? ex.s : ld ? +ld[1] * 60 + +ld[2] : rowS;
         if (s === null) continue;
         if (ex) text = stripTime(text, ex.str);
         // взрослая сессия, на которую идёт трек
@@ -634,7 +642,7 @@ function parseTracks(rows, adultDays, sp) {
         const pm = pp ? null : text.match(/\(([A-ZĀ-Ž][A-ZĀ-Ž&\s]{3,})\)/);
         if (pp) place = pp.place;
         else if (pm && !/^(ENG|RUS|LAT)$/.test(pm[1].trim())) { place = titleCase(pm[1].trim()); text = text.replace(pm[0], '').trim(); }
-        else if (subName && !hallCol) place = '#' + titleCase(subName);
+        else if (subName && !hallCol && !LEAD_RE.test(text)) place = '#' + titleCase(subName);
         t.pending.push({ day, s, e, rowE, text, col: c, place, cap, fam });
       }
     });
