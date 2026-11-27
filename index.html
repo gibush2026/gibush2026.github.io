@@ -154,6 +154,13 @@ footer{padding-block:18px calc(28px + env(safe-area-inset-bottom,0px));color:var
 footer .row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
 .refresh{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 12px;font-size:13px;font-weight:600}
 .offline{color:var(--h1t);font-weight:600}
+.pop{position:fixed;inset:0;box-sizing:border-box;z-index:30;background:rgba(5,15,40,.55);display:grid;place-items:center;padding:16px}
+.pop[hidden]{display:none}
+.pop-box{box-sizing:border-box;background:var(--surface);color:var(--ink);border-radius:18px;padding:20px;max-width:420px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.35);border-top:6px solid var(--red);display:grid;gap:10px}
+.pop-box h2{margin:0;font-size:20px;font-weight:800}
+.pop-when{font-size:12px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--red)}
+#poptext{font-size:16px;line-height:1.45;white-space:pre-line}
+#popok{margin-top:6px;border:0;border-radius:12px;padding:12px;background:var(--blue);color:#fff;font-weight:800;font-size:16px}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:20;background:var(--ink);color:var(--bg);border-radius:14px;padding:12px 16px;font-weight:600;font-size:14px;box-shadow:0 8px 30px rgba(0,0,0,.25);max-width:calc(100% - 32px);display:flex;gap:12px;align-items:center}
 .toast button{background:none;border:0;color:var(--blue);font-weight:700;padding:0}
 @media (prefers-reduced-motion: reduce){.pulse{animation:none}html{scroll-behavior:auto}}
@@ -200,6 +207,7 @@ footer .row{display:flex;justify-content:space-between;align-items:center;gap:10
   </footer>
 </div>
 
+<div class="pop" id="pop" hidden><div class="pop-box" role="alertdialog" aria-modal="true" aria-labelledby="poptitle"><div class="pop-when" id="popwhen"></div><h2 id="poptitle">Изменение в расписании</h2><div id="poptext"></div><button id="popok">Понятно</button></div></div>
 <div class="toast" id="toast" role="status" hidden><span id="toasttext"></span><button id="toastok">OK</button></div>
 
 <script>
@@ -896,6 +904,15 @@ function renderNews() {
   }).join('') + (list.length > 2 ? `<button class="linkbtn" id="allnews">${state.allNews ? 'Свернуть' : `Все объявления (${list.length})`}</button>` : '');
   const b = $('#allnews'); if (b) b.onclick = () => { state.allNews = !state.allNews; renderNews(); };
   setTimeout(() => store('gib-seen', list.map(n => n.text)), 4000);
+  showPopup();
+}
+// важные объявления (Важно = да) один раз показываем во всплывающем окне
+function showPopup() {
+  if (!$('#pop').hidden) return;
+  const done = new Set(store('gib-pop') || []);
+  const n = state.news.find(x => x.hot && !done.has(x.text)); if (!n) return;
+  $('#popwhen').textContent = n.when || ''; $('#poptext').textContent = n.text; $('#pop').hidden = false;
+  $('#popok').onclick = () => { done.add(n.text); store('gib-pop', [...done]); $('#pop').hidden = true; showPopup(); };
 }
 function renderDays() {
   const now = nowInfo();
@@ -981,7 +998,7 @@ function renderNow() {
   // показываем блок только во время Гибуша (или за 3 часа до начала)
   if (!all.length || (!live.length && (nextStart === null || nextStart - now.abs > 180))) { el.innerHTML = ''; return; }
   const next = nextStart !== null && nextStart - now.abs <= 180 ? upcoming.filter(it => absStart(it) === nextStart) : [];
-  const row = (it, showEnd) => `<button class="nowitem" data-go="${it.day.num}-${it.start}">${elsewhere(it) ? venueLabel(it) : it.hall ? hallLabel(it.hall) : it.own && !it.common ? `<span class="place">${esc(it.place || trackName())}</span>` : '<span class="hl" style="color:var(--muted)">Для всех</span>'}<span class="t">${esc(it.title)}</span><span class="s">${markFor(it) ? markFor(it) + ' ' : ''}${it.speaker ? esc(it.speaker) + ' · ' : ''}<span class="tm">${showEnd ? 'до ' + fmt(it.end) : fmt(it.start) + '–' + fmt(it.end)}</span></span></button>`;
+  const row = (it, showEnd) => `<button class="nowitem" data-go="${it.day.num}-${it.start}">${elsewhere(it) ? `<span class="place" style="color:var(--red)">${esc(it.place)}</span>` : it.hall ? hallLabel(it.hall) : it.own && !it.common ? `<span class="place">${esc(it.place || trackName())}</span>` : '<span class="hl" style="color:var(--muted)">Для всех</span>'}<span class="t">${esc(it.title)}</span><span class="s">${markFor(it) ? markFor(it) + ' ' : ''}${it.speaker ? esc(it.speaker) + ' · ' : ''}<span class="tm">${showEnd ? 'до ' + fmt(it.end) : fmt(it.start) + '–' + fmt(it.end)}</span></span></button>`;
   let html = '<div class="nowgrid">';
   if (live.length) html += `<div class="nowbox"><div class="nowhead"><span class="pulse"></span>Сейчас идёт</div>${live.map(it => row(it, true)).join('')}</div>`;
   if (next.length) {
