@@ -107,9 +107,10 @@ button{font:inherit;color:inherit;cursor:pointer}
 .nowbox.next .nowhead{color:var(--h0t)}
 .pulse{width:9px;height:9px;border-radius:50%;background:var(--red);box-shadow:0 0 0 0 rgba(254,26,77,.6);animation:pulse 1.8s infinite}
 @keyframes pulse{70%{box-shadow:0 0 0 8px rgba(254,26,77,0)}100%{box-shadow:0 0 0 0 rgba(254,26,77,0)}}
-.nowitem{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;align-items:baseline;text-align:left;background:none;border:0;border-top:1px solid var(--line);padding:9px 0;width:100%}
+.nowitem{display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 10px;align-items:baseline;text-align:left;background:none;border:0;border-top:1px solid var(--line);padding:9px 0;width:100%}
 .nowitem:first-of-type{border-top:0}
-.nowitem .hl{grid-row:span 2}
+.nowitem>.hl,.nowitem>.place{grid-row:span 2;grid-column:1}
+.nowitem .t,.nowitem .s{grid-column:2;overflow-wrap:anywhere}
 .nowitem .t{font-weight:700;line-height:1.3;min-width:0}
 .nowitem .s{font-size:13px;color:var(--muted);min-width:0}
 .nowitem .tm{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
@@ -336,6 +337,8 @@ function isName(s) {
 
 function makeItem(day, start, end, hall, raw) {
   const pin = pinOf(raw);
+  // время после места («📍Dzintari Hall — 21:00-23:00») точнее объединённых ячеек
+  if (pin && pin.time) { const t = explicitTime(pin.time.replace('–', '-')); if (t && t.s === start) end = t.e; }
   const lines = (pin ? pin.text : raw).split('\n').map(s => s.trim()).filter(Boolean);
   let speaker = '', title = '', note = '', sub = '';
   // строки-комментарии (например «Выход Шаббата в 17:01») показываем мелко под названием
