@@ -81,6 +81,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 .trk[aria-pressed="true"]{background:var(--blue);color:var(--white)}
 .place{font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
 .place::before{content:"";width:9px;height:9px;border-radius:50%;border:2px solid currentColor;box-sizing:border-box}
+.ttag{font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--blue);border:1.5px solid var(--blue);border-radius:4px;padding:1px 6px;white-space:nowrap}
 .mark{font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#0A1424;border-radius:4px;padding:2px 6px;white-space:nowrap}
 .legend{display:grid;gap:6px;margin-top:12px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
 .legend h4{margin:0;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
@@ -726,6 +727,24 @@ function parseTracks(rows, adultDays, sp) {
   }
   return out.length > 1 ? out : [];
 }
+// «Все»: взрослая программа и собственные сессии всех треков в одной ленте, с пометкой трека
+function allTrack(days, tracks) {
+  const tag = new Map(), byDay = new Map();
+  days.forEach(d => {
+    const list = [], ord = new Map();
+    d.items.forEach(it => { list.push(it); if (it.hall) tag.set(it, 'Взрослые'); ord.set(it, it.hall ? 1 + (state.halls.find(h => h.name === it.hall) || { idx: 0 }).idx : 0); });
+    tracks.forEach((t, ti) => { if (t.id === 'adults') return; t.own.filter(it => it.day === d).forEach(it => {
+      // одна и та же сессия у нескольких треков — одна карточка с несколькими пометками
+      const same = list.find(o => tag.has(o) && !o.hall && o.start === it.start && normT(o.raw) === normT(it.raw) && o.place === it.place);
+      if (same) { tag.set(same, tag.get(same) + ', ' + t.name); return; }
+      list.push(it); tag.set(it, t.name); ord.set(it, 100 + ti);
+    }); });
+    list.sort((x, y) => x.start - y.start || ord.get(x) - ord.get(y));
+    byDay.set(d.num, list);
+  });
+  return { id: 'all', name: 'Все', own: [], byDay, tag };
+}
+const tagFor = it => { const t = curTrack(); return t && t.tag ? t.tag.get(it) || '' : ''; };
 function itemsFor(day) {
   const t = state.tracks.find(x => x.id === state.track);
   return t && t.byDay ? (t.byDay.get(day.num) || []) : day.items;
@@ -750,6 +769,9 @@ function renderTracks() {
   el.hidden = false;
   el.innerHTML = state.tracks.map(t => `<button class="trk" data-track="${t.id}" aria-pressed="${t.id === state.track}">${esc(t.name)}</button>`).join('');
   el.querySelectorAll('.trk').forEach(b => b.onclick = () => setTrack(b.dataset.track));
+  // выбранный трек (например, «Все» в конце списка) — в зону видимости, без прокрутки страницы
+  const a = el.querySelector('.trk[aria-pressed="true"]');
+  if (a) { const r = a.getBoundingClientRect(), e = el.getBoundingClientRect(); if (r.right > e.right) el.scrollLeft += r.right - e.right + 16; else if (r.left < e.left) el.scrollLeft -= e.left - r.left + 16; }
 }
 function setTrack(id) {
   state.track = id; state.wantTrack = id; state.showPast = false; state.open.clear();
@@ -837,6 +859,7 @@ function apply(data, offline, fallback) {
   state.days = days; state.news = parseNews(data.n); state.info = parseInfo(data.i);
   state.updated = data.t; state.offline = offline;
   try { state.tracks = parseTracks(parseCSV(data.y || ''), days, data.ys || null); } catch (e) { state.tracks = []; }
+  if (state.tracks.length) state.tracks.push(allTrack(days, state.tracks));
   const want = state.wantTrack || state.track;
   state.track = state.tracks.some(t => t.id === want) ? want : 'adults';
   // встроенная копия — не повод показывать «изменения» новому посетителю
@@ -954,8 +977,8 @@ function card(it, now) {
   const desc = descFor(it); const changed = state.changes[it.key];
   const open = state.open.has(it.key);
   const cls = ['card', it.common ? 'common' : '', it.brk ? 'brk' : '', elsewhere(it) ? 'away' : ''].join(' ');
-  const mk = markFor(it);
-  const top = (it.hall || it.place || changed || mk) ? `<div class="card-top">${elsewhere(it) ? venueLabel(it) : hallLabel(it.hall) || (it.place ? `<span class="place">${esc(it.place)}</span>` : '<span></span>')}<span class="tags">${mk}${changed ? '<span class="badge">Изменено</span>' : ''}</span></div>` : '';
+  const mk = markFor(it), tg = tagFor(it);
+  const top = (it.hall || it.place || changed || mk || tg) ? `<div class="card-top">${elsewhere(it) ? venueLabel(it) : hallLabel(it.hall) || (it.place ? `<span class="place">${esc(it.place)}</span>` : '<span></span>')}<span class="tags">${tg ? `<span class="ttag">${esc(tg)}</span>` : ''}${mk}${changed ? '<span class="badge">Изменено</span>' : ''}</span></div>` : '';
   const inner = `${top}${it.speaker ? `<div class="speaker">${esc(it.speaker)}</div>` : ''}<h3 class="title">${esc(it.title)}</h3>${it.sub ? `<div class="speaker">${esc(it.sub)}</div>` : ''}${it.note ? `<div class="note">${esc(it.note)}</div>` : ''}${it.cmt ? `<div class="cmt">${esc(it.cmt)}</div>` : ''}${desc ? (open ? `<div class="desc">${esc(desc)}</div>` : '<div class="more">Подробнее</div>') : ''}`;
   return desc ? `<button class="${cls}" data-key="${esc(it.key)}" aria-expanded="${open}">${inner}</button>` : `<article class="${cls}">${inner}</article>`;
 }
@@ -1010,7 +1033,7 @@ function renderNow() {
   // показываем блок только во время Гибуша (или за 3 часа до начала)
   if (!all.length || (!live.length && (nextStart === null || nextStart - now.abs > 180))) { el.innerHTML = ''; return; }
   const next = nextStart !== null && nextStart - now.abs <= 180 ? upcoming.filter(it => absStart(it) === nextStart) : [];
-  const row = (it, showEnd) => `<button class="nowitem" data-go="${it.day.num}-${it.start}">${elsewhere(it) ? `<span class="place" style="color:var(--red)">${esc(it.place)}</span>` : it.hall ? hallLabel(it.hall) : it.own && !it.common ? `<span class="place">${esc(it.place || trackName())}</span>` : '<span class="hl" style="color:var(--muted)">Для всех</span>'}<span class="t">${esc(it.title)}</span><span class="s">${markFor(it) ? markFor(it) + ' ' : ''}${it.speaker ? esc(it.speaker) + ' · ' : ''}<span class="tm">${showEnd ? 'до ' + fmt(it.end) : fmt(it.start) + '–' + fmt(it.end)}</span></span></button>`;
+  const row = (it, showEnd) => `<button class="nowitem" data-go="${it.day.num}-${it.start}">${elsewhere(it) ? `<span class="place" style="color:var(--red)">${esc(it.place)}</span>` : it.hall ? hallLabel(it.hall) : it.own && !it.common ? `<span class="place">${esc(it.place || tagFor(it) || trackName())}</span>` : '<span class="hl" style="color:var(--muted)">Для всех</span>'}<span class="t">${esc(it.title)}</span><span class="s">${tagFor(it) && (it.hall || it.place) ? esc(tagFor(it)) + ' · ' : ''}${markFor(it) ? markFor(it) + ' ' : ''}${it.speaker ? esc(it.speaker) + ' · ' : ''}<span class="tm">${showEnd ? 'до ' + fmt(it.end) : fmt(it.start) + '–' + fmt(it.end)}</span></span></button>`;
   let html = '<div class="nowgrid">';
   if (live.length) html += `<div class="nowbox"><div class="nowhead"><span class="pulse"></span>Сейчас идёт</div>${live.map(it => row(it, true)).join('')}</div>`;
   if (next.length) {
